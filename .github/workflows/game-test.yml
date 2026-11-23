@@ -2,8 +2,8 @@ name: Game tests
 
 # The reusable GTNH build workflow runs `check`, which now includes the JUnit suite, Spotless/Checkstyle, the JaCoCo
 # floor and the game-test compilation. This workflow adds the part `check` cannot do on its own: a real dedicated
-# server and real Forge startup. `./gradlew gameTestServer` writes eula.txt/server.properties itself and exits with the
-# game test's result.
+# server, real Forge startup and a real client (under Xvfb). `./gradlew gameTestServer` writes eula.txt/server.properties
+# itself, and both game runs exit with their own result.
 
 on:
   pull_request:
@@ -17,7 +17,7 @@ permissions:
 
 jobs:
   game-test:
-    name: Unit tests + dedicated-server game tests
+    name: Unit tests + server and client game tests
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -62,6 +62,61 @@ jobs:
           name: solarflux-game-test-log
           path: run/server/logs/
           if-no-files-found: warn
+
+      # The client half covers the GUI title and the config GUI. A headless Ubuntu runner needs a virtual display and
+      # a software GL stack; LWJGL2 uses the GLX/OpenGL 2 profile that llvmpipe provides.
+      - name: Install a virtual display for the client test
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            xvfb libgl1-mesa-dri libglx-mesa0 mesa-utils \
+            libxcursor1 libxrandr2 libxi6 libxxf86vm1 libxinerama1
+
+      - name: Run the client game tests
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: xvfb-run -a -s "-screen 0 1024x768x24" ./gradlew runClient -PgameTest --stacktrace
+
+      - name: Check the client-test marker
+        run: |
+          ls -l run/client/logs/ || true
+          grep -hE "\[SOLARFLUX-CLIENTTEST\] [0-9]+/[0-9]+ checks passed" run/client/logs/*.log || true
+          grep -hq "SOLARFLUX_CLIENTTEST_OK" run/client/logs/*.log
+          ! grep -hq "SOLARFLUX_CLIENTTEST_FAILED" run/client/logs/*.log
+
+      - name: Upload the client log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: solarflux-client-test-log
+          path: run/client/logs/
+          if-no-files-found: warn
+
+      - name: Upload the unit-test report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: solarflux-unit-tests
+          path: build/reports/tests/test/
+          if-no-files-found: warn
+
+      # Informational for now: once the changed-line baseline is stable, add --fail-under=NN to make it a gate.
+      - name: Coverage on changed lines
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          python3 -m pip install --quiet diff-cover
+          git fetch --no-tags origin "+refs/heads/${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}"
+          diff-cover build/reports/jacoco/test/jacocoTestReport.xml \
+            --compare-branch=origin/${{ github.base_ref }}
+
+      - name: Publish the check summary
+        if: always()
+        run: |
+          {
+            echo "## Game tests"
+            grep -hE "checks passed" run/server/logs/*.log run/client/logs/*.log 2>/dev/null || echo "no check marker found"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload the coverage reports
         if: always()

@@ -26,7 +26,7 @@ Baseline measurements:
 | Branch coverage (filtered) | 374 / 584 = **64.0 %** |
 | Coverage gate | 55 % line / 55 % branch + per-package rules (9.0 / 9.0 points below actual) |
 | Excluded from the gate | only the client-only screens: `GuiSolarPanel`, `core.gui.BaseModGui`, the two config-GUI classes, `client/**`, `creativetab/**`, `Tags` |
-| Server game-test checks | **192 / 192** passing (`./gradlew gameTestServer`) |
+| Server game-test checks | **198 / 198** passing (`./gradlew gameTestServer`) |
 | Client game-test checks | **6 / 6** passing (`./gradlew runClient -PgameTest`) |
 | Game-test coverage (separate report, server run) | 1035 / 1480 lines = **69.9 %**, branches 51.3 % |
 
@@ -708,9 +708,10 @@ the game test covers the former. The table above is the original analysis.
 
 ### 6.2 Harness changes that unlock the tests
 
-**Status:** the world builder, the deterministic tick alignment, the narrowed exclusion and the
-per-package rules are done. Still open: the `SolarFluxTestBase`/`TestPanel` builders (the suite works
-and each class is explicit about its setup) and seed control for `Utils.RANDOM`.
+**Status:** closed as unnecessary. `TestFixture` already centralises the configuration/upgrade setup and
+`TestWorld` the world stubs, so a `SolarFluxTestBase` would only re-wrap them; the tick alignment is
+deterministic through `TestWorld.alignedTo`, so seed control for `Utils.RANDOM` is not needed either.
+The bullets below are kept as the original analysis.
 
 * **`SolarFluxTestBase`** with a `@Before` that calls `applyDefaultConfiguration()`,
   `installUpgradeItems()` and `disableAutoBalance()`, and an `@After` that resets
@@ -873,7 +874,8 @@ the fix holds.
 **Status:** 56 (upgrades through the inventory), 57 (traversal chain), 58 (energy sharing), 59
 (dismantle → place round trip), 60 (furnace) and 61 (recipe content) are covered, on top of the
 already-covered 62 (registry/names) and 64 (sync keys). 55 is covered in-game too (midnight is dark,
-rain scales noon output); 63 is partially covered by `checksConfiguration`.
+rain scales noon output); 63 is covered by `checksConfiguration` plus the new `checksLocalisation`
+(every active tier has a name, custom tiers included).
 
 These cover the parts a unit test genuinely cannot. The current suite is good; the gaps are the
 behaviours that were just found:
@@ -909,25 +911,21 @@ behaviours that were just found:
 
 ### 6.5 CI / build harness
 
-* `game-test.yml` runs `./gradlew test gameTestServer`; keep it, but also run `check` (or
-  `spotlessCheck checkstyleMain`) so style drift cannot land through the game-test path. The
-  reusable `build-and-test.yml` already runs `check`, but the explicit workflow is what developers
-  copy.
-* The client half (`./gradlew runClient -PgameTest`) is fully automated — it exits with the result — but
-  it needs a display. On CI that means `xvfb-run` plus a software GL stack (Mesa/llvmpipe); it is not
-  wired into `game-test.yml` yet because that setup is unverified here. Run it locally or on a
-  self-hosted runner with a GPU.
+* `game-test.yml` runs `./gradlew test gameTestServer` and then `runClient -PgameTest` — **done**; the
+  reusable `build-and-test.yml` still runs `check`, so style and coverage cannot land through the
+  game-test path.
+* The client half is wired into `game-test.yml`: `xvfb-run` with Mesa/llvmpipe (`LIBGL_ALWAYS_SOFTWARE=1`),
+  a marker check and its own log artifact. **Done**; the first CI run is the real validation.
 * Raise the JaCoCo floor — **done**: 55/55 bundle floor plus the per-package rules from §6.2.
 * Add `jacocoTestReport` as a dependency of `check` — **done**.
-* Consider `diff-cover` (or a `jacocoTestCoverageVerification` rule on new classes) in PR CI: the
-  bundle-wide ratio does not protect a new class. This is a small workflow step, not a Gradle plugin.
-* `Test` logging: keep `failed`/`skipped` locally, but add `--info`/`showStandardStreams` on the CI
-  job so the game-test output and any `System.out` diagnostics are visible in the log artifact.
-* The game-test workflow uploads `run/server/logs/` and `build/reports/jacoco/`; also upload
-  `build/reports/tests/test/` on failure. Cheap and it saves a round trip.
+* `diff-cover` on changed lines — **done, informational** (`continue-on-error`); add `--fail-under=NN`
+  once the baseline is stable.
+* The workflow uploads `run/server/logs/`, `run/client/logs/`, `build/reports/jacoco/` and
+  `build/reports/tests/test/` on failure — **done**. `--info` is unnecessary because both game logs
+  are uploaded.
 * Keep the game-test coverage report separate (the README explains why the class ids cannot be
-  merged; that is correct). Consider publishing the game-test percentage as an informational metric
-  in the job summary so regressions are visible even though they are not gated.
+  merged; that is correct). The job summary now prints the server/client check lines — **done**.
+* Add `--info`/`showStandardStreams` only if a future failure needs more than the uploaded logs.
 
 ### 6.6 Suggested order and expected outcome
 
@@ -945,9 +943,9 @@ which is a defensible place to raise the floor. The remaining 30 % is the recipe
 registration classes, the mod entry point and the rendering/config GUI code — all of which need a
 Forge launch or a booted client, and the game test is the right home for them.
 
-**Status:** waves 0–4 are done (288 unit tests, 63.4 % line / 63.5 % branch, with the bundle floor at
-55/55 and per-package rules). Wave 5 is mostly done too: the game test now runs **192 checks** at
-69.9 % line / 51.3 % branch; §6.4 lists the few remaining scenarios.
+**Status:** waves 0–4 are done (292 unit tests, 64.0 % line / 64.0 % branch, with the bundle floor at
+55/55 and per-package rules). Wave 5 is done too: the game test runs **198 checks** at 69.9 % line /
+51.3 % branch, and both the server and the client run in CI (the client under Xvfb with software GL).
 
 ---
 

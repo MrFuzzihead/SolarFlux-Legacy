@@ -88,6 +88,7 @@ final class SolarFluxGameTests {
     static void runAll(World pWorld) {
         checksConfiguration();
         checksRegistration();
+        checksLocalisation();
         checksRecipes();
         checksRecipeContent();
         checksPlacedPanel(pWorld);
@@ -1026,6 +1027,39 @@ final class SolarFluxGameTests {
     private static void clearBlocks(World pWorld, int pX, int pZ, int pCount) {
         for (int i = 0; i < pCount; ++i) {
             pWorld.setBlockToAir(pX + i, TEST_HEIGHT, pZ);
+        }
+    }
+
+    /** Every active tier must have a name in the shipped English lang file (custom tiers included). */
+    private static void checksLocalisation() {
+        java.util.Set<String> keys = new java.util.HashSet<>();
+        java.io.InputStream stream = SolarFluxGameTests.class.getResourceAsStream("/assets/solarflux/lang/en_US.lang");
+        if (stream == null) {
+            check(false, "the English lang file must be on the classpath");
+            return;
+        }
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(
+            new java.io.InputStreamReader(stream, java.nio.charset.StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                int separator = line.indexOf('=');
+                if (!line.isEmpty() && !line.startsWith("#") && separator > 0) {
+                    keys.add(line.substring(0, separator));
+                }
+            }
+        } catch (java.io.IOException e) {
+            check(false, "reading the lang file threw: " + e);
+            return;
+        }
+
+        for (int tier = 0; tier < ModBlocks.getSolarPanels()
+            .size(); ++tier) {
+            if (!ModConfiguration.getTierConfiguration(tier)
+                .isActive()) {
+                continue;
+            }
+            String key = "tile.solarflux:solar" + tier + ".name";
+            check(keys.contains(key), "active tier " + (tier + 1) + " needs " + key);
         }
     }
 
