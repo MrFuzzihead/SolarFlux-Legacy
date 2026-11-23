@@ -1,0 +1,84 @@
+package com.mrfuzzihead.solarflux.blocks.modules;
+
+import java.util.LinkedList;
+import java.util.Set;
+
+import net.minecraftforge.common.util.ForgeDirection;
+
+import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
+import com.mrfuzzihead.solarflux.blocks.SolarPanelTileEntity;
+import com.mrfuzzihead.solarflux.config.ModConfiguration;
+import com.mrfuzzihead.solarflux.core.utility.BlockPosition;
+import com.mrfuzzihead.solarflux.init.ModItems;
+
+public class TraversalEnergyDispenserModule extends SimpleEnergyDispenserModule {
+
+    private final Set<BlockPosition> mVisitedBlocks = Sets.newHashSet();
+    private final LinkedList<BlockPosition> mBlocksToVisit = Lists.newLinkedList();
+    private int mDirectNeighborDiscovered;
+
+    public TraversalEnergyDispenserModule(SolarPanelTileEntity pTileEntity) {
+        super(pTileEntity);
+    }
+
+    protected void searchTargets() {
+        if (searchFinished()) {
+            // We have our new targets.
+            getTargets().clear();
+            getTargets().addAll(mVisitedBlocks);
+            // Reset the search.
+            mVisitedBlocks.clear();
+            discoverNeighbors(new BlockPosition(getTileEntity().x(), getTileEntity().y(), getTileEntity().z()));
+            mDirectNeighborDiscovered = mBlocksToVisit.size();
+        }
+
+        // If we reached the max number of target we stop the search.
+        if (mVisitedBlocks.size() >= mDirectNeighborDiscovered + getMaximumExtraTargets()) {
+            mBlocksToVisit.clear();
+        }
+
+        progressSearch();
+    }
+
+    @Override
+    protected int getTargetRefreshRate() {
+        return ModConfiguration.getTraversalUpgradeUpdateRate();
+    }
+
+    private void progressSearch() {
+        if (!searchFinished()) {
+            // TODO use pop for DFS
+            BlockPosition position = mBlocksToVisit.remove();
+            mVisitedBlocks.add(position);
+            discoverNeighbors(position);
+        }
+    }
+
+    private boolean searchFinished() {
+        return mBlocksToVisit.isEmpty();
+    }
+
+    /**
+     * Discover blocks that should be traveled around the location provided.
+     */
+    private void discoverNeighbors(BlockPosition pPosition) {
+        for (ForgeDirection direction : ForgeDirection.VALID_DIRECTIONS) {
+            BlockPosition neighbor = pPosition.move(direction);
+            // A block reachable from two parents (a diamond) used to be queued twice: it was only tested against the
+            // visited set, which is filled when a block is popped. The queue has to be checked as well, or the search
+            // runs extra rounds and the target list is published late.
+            if (!mVisitedBlocks.contains(neighbor) && !mBlocksToVisit.contains(neighbor) && isValidTarget(neighbor)) {
+                mBlocksToVisit.add(neighbor);
+            }
+        }
+    }
+
+    /**
+     * Returns the maximum amount of target that can be found in addition to the 4 neighbors of the block.
+     */
+    public int getMaximumExtraTargets() {
+        return getTileEntity().getUpgradeCount(ModItems.mUpgradeTraversal)
+            * ModConfiguration.getTraversalUpgradeIncrease();
+    }
+}

@@ -130,13 +130,13 @@ fun jacocoClassDirs() = project.files(mainSourceSet.output.classesDirs).asFileTr
     // booted client and cannot be exercised by a headless unit test. Everything else is measured, so the number stays
     // honest.
     exclude(
-        "com/nauktis/solarflux/Tags.class",
-        "com/nauktis/solarflux/client/**",
-        "com/nauktis/solarflux/config/ModConfigurationGui*.class",
-        "com/nauktis/solarflux/config/ConfigurationGuiFactory.class",
-        "com/nauktis/solarflux/gui/**",
-        "com/nauktis/solarflux/core/gui/**",
-        "com/nauktis/solarflux/creativetab/**"
+        "com/mrfuzzihead/solarflux/Tags.class",
+        "com/mrfuzzihead/solarflux/client/**",
+        "com/mrfuzzihead/solarflux/config/ModConfigurationGui*.class",
+        "com/mrfuzzihead/solarflux/config/ConfigurationGuiFactory.class",
+        "com/mrfuzzihead/solarflux/gui/**",
+        "com/mrfuzzihead/solarflux/core/gui/**",
+        "com/mrfuzzihead/solarflux/creativetab/**"
     )
 }
 
@@ -221,7 +221,7 @@ if (isGameTestRun) {
         project.layout.buildDirectory.file("jacoco/gameTest.exec")
             .map { it.asFile.absolutePath }
     )
-    jacocoProvider.includes.set("com/nauktis/solarflux/*")
+    jacocoProvider.includes.set("com/mrfuzzihead/solarflux/*")
     jacocoProvider.classDumpDir.set(
         project.layout.buildDirectory.dir("jacoco/gameTestClasses")
             .map { it.asFile.absolutePath }
@@ -322,11 +322,11 @@ tasks.register<JacocoReport>("jacocoGameTestReport") {
     classDirectories.setFrom(
         project.layout.buildDirectory.dir("jacoco/gameTestClasses").map { dir ->
             project.files(dir).asFileTree.matching {
-                include("com/nauktis/solarflux/**")
+                include("com/mrfuzzihead/solarflux/**")
                 exclude(
-                    "com/nauktis/solarflux/Tags.class",
+                    "com/mrfuzzihead/solarflux/Tags.class",
                     // The game-test mod itself is not part of the mod.
-                    "com/nauktis/solarflux/gametest/**"
+                    "com/mrfuzzihead/solarflux/gametest/**"
                 )
             }
         }

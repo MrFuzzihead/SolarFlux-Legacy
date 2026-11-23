@@ -49,3 +49,5 @@ info.solarflux.upgrade.capacity=Increases the internal capacity by %.2f%%.
 info.solarflux.upgrade.furnace=Accumulates energy to heat vanilla furnaces.
 info.solarflux.rf=RF
 info.solarflux.rfPerTick=RF/t
+container.solarflux.panel=Solar Panel
+info.solarflux.crafting.component=Crafting component
