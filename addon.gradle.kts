@@ -242,6 +242,7 @@ tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
 // `check` runs the tests and enforces the floor, so CI catches coverage regressions.
 tasks.named("check").configure {
     dependsOn(tasks.named("jacocoTestCoverageVerification"))
+    dependsOn(tasks.named("jacocoTestReport"))
 }
 
 // ---------------------------------------------------------------------------------------------------------

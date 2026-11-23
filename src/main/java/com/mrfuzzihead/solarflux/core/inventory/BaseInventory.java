@@ -93,17 +93,16 @@ public class BaseInventory implements IInventory {
     @Override
     public ItemStack decrStackSize(int pSlotIndex, int pDecrementAmount) {
         ItemStack itemStack = getStackInSlot(pSlotIndex);
-        if (itemStack != null) {
-            if (itemStack.stackSize <= pDecrementAmount) {
-                setInventorySlotContents(pSlotIndex, null);
-            } else {
-                itemStack = itemStack.splitStack(pDecrementAmount);
-                if (itemStack.stackSize == 0) {
-                    setInventorySlotContents(pSlotIndex, null);
-                }
-            }
+        if (itemStack == null || pDecrementAmount <= 0) {
+            // A zero/negative decrement removes nothing; splitStack(0) would return an empty stack and the old code
+            // then cleared the slot.
+            return null;
         }
-        return itemStack;
+        if (pDecrementAmount >= itemStack.stackSize) {
+            setInventorySlotContents(pSlotIndex, null);
+            return itemStack;
+        }
+        return itemStack.splitStack(pDecrementAmount);
     }
 
     @Override

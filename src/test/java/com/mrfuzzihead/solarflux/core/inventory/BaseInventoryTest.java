@@ -2,6 +2,7 @@ package com.mrfuzzihead.solarflux.core.inventory;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
@@ -86,6 +87,50 @@ public class BaseInventoryTest {
 
         assertEquals(3, inventory.decrStackSize(1, 99).stackSize);
         assertNull(inventory.getStackInSlot(1));
+    }
+
+    @Test
+    public void decrementingByZeroLeavesTheStackAlone() {
+        BaseInventory inventory = new BaseInventory("Test", 1);
+        inventory.setInventorySlotContents(0, TestFixture.stack(10, 0));
+
+        assertNull(inventory.decrStackSize(0, 0));
+        assertNull(inventory.decrStackSize(0, -3));
+        assertNotNull(inventory.getStackInSlot(0));
+        assertEquals(10, inventory.getStackInSlot(0).stackSize);
+    }
+
+    @Test
+    public void randomOperationsKeepEverySlotWithinItsLimits() {
+        java.util.Random random = new java.util.Random(42);
+        for (int size = 1; size <= 8; ++size) {
+            BaseInventory inventory = new BaseInventory("Test", size);
+            for (int operation = 0; operation < 200; ++operation) {
+                int slot = random.nextInt(size);
+                switch (random.nextInt(3)) {
+                    case 0:
+                        inventory.setInventorySlotContents(
+                            slot,
+                            random.nextBoolean() ? TestFixture.stack(random.nextInt(64) + 1, 0) : null);
+                        break;
+                    case 1:
+                        inventory.decrStackSize(slot, random.nextInt(70));
+                        break;
+                    default:
+                        if (inventory.getStackInSlot(slot) != null) {
+                            inventory.getStackInSlotOnClosing(slot);
+                        }
+                        break;
+                }
+                for (int i = 0; i < size; ++i) {
+                    ItemStack stack = inventory.getStackInSlot(i);
+                    if (stack != null) {
+                        assertTrue(stack.stackSize > 0);
+                        assertTrue(stack.stackSize <= inventory.getInventoryStackLimit());
+                    }
+                }
+            }
+        }
     }
 
     @Test

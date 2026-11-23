@@ -21,14 +21,14 @@ Baseline measurements:
 
 | Metric | Value |
 | --- | --- |
-| Test cases | 288 |
-| Line coverage (JaCoCo, filtered) | 1041 / 1641 = **63.4 %** |
-| Branch coverage (filtered) | 371 / 584 = **63.5 %** |
-| Coverage gate | 55 % line / 55 % branch + per-package rules (8.4 / 8.5 points below actual) |
+| Test cases | 292 |
+| Line coverage (JaCoCo, filtered) | 1049 / 1640 = **64.0 %** |
+| Branch coverage (filtered) | 374 / 584 = **64.0 %** |
+| Coverage gate | 55 % line / 55 % branch + per-package rules (9.0 / 9.0 points below actual) |
 | Excluded from the gate | only the client-only screens: `GuiSolarPanel`, `core.gui.BaseModGui`, the two config-GUI classes, `client/**`, `creativetab/**`, `Tags` |
-| Server game-test checks | **187 / 187** passing (`./gradlew gameTestServer`) |
+| Server game-test checks | **192 / 192** passing (`./gradlew gameTestServer`) |
 | Client game-test checks | **6 / 6** passing (`./gradlew runClient -PgameTest`) |
-| Game-test coverage (separate report, server run) | 1032 / 1481 lines = **69.7 %**, branches 51.1 % |
+| Game-test coverage (separate report, server run) | 1035 / 1480 lines = **69.9 %**, branches 51.3 % |
 
 The suite is in good shape for its age: `StatefulEnergyStorage` (100 %), `BaseInventory` (97 %),
 `ConnectedIconHandler` (97 %), `core.utility` (93 %) and `items` (79 %) are well covered. The gaps are
@@ -71,6 +71,7 @@ or configuration-dependent, **S4** = cosmetic / hygiene.
 | I6 | S3 | `BaseInventory.readFromNBT` trusts the stored slot index (pinned as an AIOOBE test) | `BaseInventory:44` |
 | I7 | S4 | `isItemValidForSlot(null, …)` NPEs; the check uses the held stack size, not the resulting slot size | `SolarPanelTileEntity:413-419` |
 | I8 | S3 | `BaseInventory.setInventorySlotContents` notifies itself (no-op) instead of the owning tile entity; every caller must remember `TE.markDirty()` | `BaseInventory:104-112` |
+| I9 | S3 | `BaseInventory.decrStackSize(slot, 0)` clears the slot (`splitStack(0)` returns an empty stack, which the old code treated as drained) — found by the §6.3 property test | `BaseInventory:66-79` |
 | G1 | S2 | GUI title reads the **player's** inventory name → always "Inventory" | `GuiSolarPanel:46-52` |
 | G2 | S4 | Hard-coded "Crafting component" and "Solar Panel"; `hasCustomInventoryName()` is always false, so nothing is localised | `CraftingItem:19`, `BaseInventory:21,107` |
 | G3 | S4 | Config GUI exposes only `CATEGORY_GENERAL`; upgrades and tiers are file-only | `ModConfigurationGui` |
@@ -210,6 +211,10 @@ answers `FMLMissingMappingsEvent`. Renaming `SolarFlux` → `solarflux` changes 
 registry name, so it would need ~30 remaps, a config-file move (`SolarFlux.cfg` → `solarflux.cfg`), and
 would still trigger the world's "different mods" warning and break third-party `after:SolarFlux`
 declarations. The tile-entity id is independent of the modid and is namespaced above.
+
+**Batch 9 — coverage follow-ups.** The property test from §6.3 exposed I9 (`decrStackSize(slot, 0)`
+deleting the stack); it is fixed with a regression test. The same batch added the tooltip branch tests
+(49–50), the in-game midnight/rain checks (§6.4 #55) and wired `jacocoTestReport` into `check`.
 
 ### 1.3 Client test harness
 
@@ -725,12 +730,9 @@ and each class is explicit about its setup) and seed control for `Utils.RANDOM`.
 
 ### 6.3 New / extended unit tests
 
-**Status:** items 1–17, 19–37, 39–47 and 51–54 are implemented across the classes listed in §1.1 plus
-`SunIntensityTest`, `UpgradeMathTest`, `SolarPanelSunTest`, `PanelEnergyTest`, `PanelUpgradesTest`,
-`PanelSyncTest`, `ModConfigurationLoadTest`, `LangIntegrityTest` and `GuiHandlerTest`. Remaining: 18
-(the tick-shift setter is unnecessary now that `TestWorld` pins the time), 38 (an `ItemStack` round
-trip cannot work in a unit test because items are unregistered — the game test covers it) and 49–50
-(the shift-held tooltip needs a seam for the LWJGL call).
+**Status:** all items are implemented or explained. 18 is unnecessary (`TestWorld` pins the time), 38's
+`ItemStack` NBT round trip is impossible headless but the in-memory property test is in (and found I9),
+and 49–50 are covered by statically mocking `ClientUtils` with Mockito.
 
 Grouped by file; the names are suggestions, the assertions are the point. The entries marked
 **regression** encode the defects above; most of them fail on today's code and become the proof that
@@ -869,9 +871,9 @@ the fix holds.
 ### 6.4 Game-test additions (`src/gameTest`)
 
 **Status:** 56 (upgrades through the inventory), 57 (traversal chain), 58 (energy sharing), 59
-(dismantle → place round trip), 60 (furnace) and 61 (recipe content) are now covered, on top of the
-already-covered 62 (registry/names) and 64 (sync keys). 55's curve is unit-tested and the noon wiring
-is in the game test; 63 is partially covered by `checksConfiguration`.
+(dismantle → place round trip), 60 (furnace) and 61 (recipe content) are covered, on top of the
+already-covered 62 (registry/names) and 64 (sync keys). 55 is covered in-game too (midnight is dark,
+rain scales noon output); 63 is partially covered by `checksConfiguration`.
 
 These cover the parts a unit test genuinely cannot. The current suite is good; the gaps are the
 behaviours that were just found:
@@ -916,8 +918,7 @@ behaviours that were just found:
   wired into `game-test.yml` yet because that setup is unverified here. Run it locally or on a
   self-hosted runner with a GPU.
 * Raise the JaCoCo floor — **done**: 55/55 bundle floor plus the per-package rules from §6.2.
-* Add `jacocoTestReport` as a dependency of `check` (currently only `jacocoTestCoverageVerification`
-  is wired), so the HTML is always fresh after `./gradlew check`.
+* Add `jacocoTestReport` as a dependency of `check` — **done**.
 * Consider `diff-cover` (or a `jacocoTestCoverageVerification` rule on new classes) in PR CI: the
   bundle-wide ratio does not protect a new class. This is a small workflow step, not a Gradle plugin.
 * `Test` logging: keep `failed`/`skipped` locally, but add `--info`/`showStandardStreams` on the CI
@@ -945,8 +946,8 @@ registration classes, the mod entry point and the rendering/config GUI code — 
 Forge launch or a booted client, and the game test is the right home for them.
 
 **Status:** waves 0–4 are done (288 unit tests, 63.4 % line / 63.5 % branch, with the bundle floor at
-55/55 and per-package rules). Wave 5 is mostly done too: the game test now runs **187 checks** at
-69.7 % line / 51.1 % branch; §6.4 lists the few remaining scenarios.
+55/55 and per-package rules). Wave 5 is mostly done too: the game test now runs **192 checks** at
+69.9 % line / 51.3 % branch; §6.4 lists the few remaining scenarios.
 
 ---
 

@@ -102,6 +102,7 @@ final class SolarFluxGameTests {
         checksEnergySharing(pWorld);
         checksDismantleRoundTrip(pWorld);
         checksFurnaceUpgrade(pWorld);
+        checksSunInSitu(pWorld);
     }
 
     /**
@@ -1025,6 +1026,59 @@ final class SolarFluxGameTests {
     private static void clearBlocks(World pWorld, int pX, int pZ, int pCount) {
         for (int i = 0; i < pCount; ++i) {
             pWorld.setBlockToAir(pX + i, TEST_HEIGHT, pZ);
+        }
+    }
+
+    /** The real weather and time paths, not just the pure sun model: midnight is dark, rain scales noon output. */
+    private static void checksSunInSitu(World pWorld) {
+        int x = 0;
+        int z = 60;
+        Block block = GameRegistry.findBlock(Reference.MOD_ID, "solar1");
+        pWorld.setBlock(x, TEST_HEIGHT, z, block);
+        SolarPanelTileEntity panel = (SolarPanelTileEntity) pWorld.getTileEntity(x, TEST_HEIGHT, z);
+        check(panel != null, "the sun-in-situ test needs a panel");
+        if (panel == null) {
+            pWorld.setBlockToAir(x, TEST_HEIGHT, z);
+            return;
+        }
+
+        long previousTime = pWorld.getWorldTime();
+        // World.isRaining() reads the smoothed strength, not WorldInfo.raining; set it directly so the check does not
+        // depend on the server's weather ramp.
+        float previousRaining = pWorld.rainingStrength;
+        float previousRainingPrevious = pWorld.prevRainingStrength;
+        try {
+            pWorld.setWorldTime(18000L);
+            panel.setEnergyStored(0);
+            panel.setCurrentEnergyGeneration(0);
+            for (int tick = 0; tick < 40; ++tick) {
+                pWorld.getWorldInfo()
+                    .incrementTotalWorldTime(pWorld.getTotalWorldTime() + 1L);
+                panel.updateEntity();
+            }
+            checkEquals(0, panel.getCurrentEnergyGeneration(), "midnight generation");
+            checkEquals(0, panel.getEnergyStored(), "midnight stored energy");
+
+            pWorld.setWorldTime(6000L);
+            pWorld.rainingStrength = 1.0F;
+            pWorld.prevRainingStrength = 1.0F;
+            int ticks = tickUntil(panel, pWorld, 100, new Condition() {
+
+                @Override
+                public boolean isTrue() {
+                    return panel.getCurrentEnergyGeneration() > 0;
+                }
+            });
+            check(ticks > 0, "rain at noon must still generate");
+            checkEquals(
+                Math.round(panel.getMaximumEnergyGeneration() * ModConfiguration.getRainGenerationFactor()),
+                panel.getCurrentEnergyGeneration(),
+                "rain must scale the generation");
+        } finally {
+            pWorld.rainingStrength = previousRaining;
+            pWorld.prevRainingStrength = previousRainingPrevious;
+            pWorld.setWorldTime(previousTime);
+            pWorld.setBlockToAir(x, TEST_HEIGHT, z);
         }
     }
 }
