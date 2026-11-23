@@ -126,16 +126,16 @@ listOf("testCompileClasspath", "testRuntimeClasspath").forEach { name ->
 val jacocoExecFiles = project.files(project.layout.buildDirectory.file("jacoco/test.exec"))
 
 fun jacocoClassDirs() = project.files(mainSourceSet.output.classesDirs).asFileTree.matching {
-    // The generated version holder, the rendering code (GUI/block/item icons) and the click-driven config GUI need a
-    // booted client and cannot be exercised by a headless unit test. Everything else is measured, so the number stays
-    // honest.
+    // The generated version holder, the rendering code (the GUI screens and block/item icons) and the click-driven
+    // config GUI need a booted client and cannot be exercised by a headless unit test. The containers and their base
+    // class are plain Java and are measured; everything else is measured too, so the number stays honest.
     exclude(
         "com/mrfuzzihead/solarflux/Tags.class",
         "com/mrfuzzihead/solarflux/client/**",
         "com/mrfuzzihead/solarflux/config/ModConfigurationGui*.class",
         "com/mrfuzzihead/solarflux/config/ConfigurationGuiFactory.class",
-        "com/mrfuzzihead/solarflux/gui/**",
-        "com/mrfuzzihead/solarflux/core/gui/**",
+        "com/mrfuzzihead/solarflux/gui/GuiSolarPanel.class",
+        "com/mrfuzzihead/solarflux/core/gui/BaseModGui.class",
         "com/mrfuzzihead/solarflux/creativetab/**"
     )
 }
@@ -166,20 +166,74 @@ tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
     executionData.setFrom(jacocoExecFiles)
 
     violationRules {
+        // Bundle-wide regression guard. The floor is the measured value minus a safety margin, not a target.
         rule {
             limit {
                 counter = "LINE"
                 value = "COVEREDRATIO"
-                // A regression guard at the measured baseline (48.6% line / 52.7% branch with 181 tests when this
-                // harness landed), not a target. The remaining uncovered lines are the recipe registrars, the item and
-                // block registration and the mod entry point, all of which need the Forge registries - the in-game test
-                // mod covers them instead.
-                minimum = BigDecimal("0.46")
+                minimum = BigDecimal("0.55")
             }
             limit {
                 counter = "BRANCH"
                 value = "COVEREDRATIO"
-                minimum = BigDecimal("0.50")
+                minimum = BigDecimal("0.55")
+            }
+        }
+        // Per-package guards, so one large uncovered class cannot hide behind the average. The recipe registrars,
+        // registration classes and the mod entry point are deliberately absent: only the game test reaches them.
+        rule {
+            element = "PACKAGE"
+            includes = listOf(
+                "com/mrfuzzihead/solarflux/blocks",
+                "com/mrfuzzihead/solarflux/blocks/modules",
+                "com/mrfuzzihead/solarflux/core/utility",
+                "com/mrfuzzihead/solarflux/core/inventory",
+                "com/mrfuzzihead/solarflux/core/block",
+                "com/mrfuzzihead/solarflux/core/block/icon"
+            )
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = BigDecimal("0.90")
+            }
+        }
+        rule {
+            element = "PACKAGE"
+            includes = listOf(
+                "com/mrfuzzihead/solarflux/items",
+                "com/mrfuzzihead/solarflux/core/item"
+            )
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = BigDecimal("0.85")
+            }
+        }
+        rule {
+            element = "PACKAGE"
+            includes = listOf("com/mrfuzzihead/solarflux/config")
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = BigDecimal("0.70")
+            }
+        }
+        rule {
+            element = "PACKAGE"
+            includes = listOf("com/mrfuzzihead/solarflux/gui")
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = BigDecimal("0.60")
+            }
+        }
+        rule {
+            element = "PACKAGE"
+            includes = listOf("com/mrfuzzihead/solarflux/core/gui")
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = BigDecimal("0.80")
             }
         }
     }

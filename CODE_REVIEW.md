@@ -21,11 +21,11 @@ Baseline measurements:
 
 | Metric | Value |
 | --- | --- |
-| Test cases | 274 |
-| Line coverage (JaCoCo, filtered) | 888 / 1490 = **59.6 %** |
-| Branch coverage (filtered) | 290 / 456 = **63.6 %** |
-| Coverage gate | 46 % line / 50 % branch (13.6 / 13.6 points below actual) |
-| Excluded from the gate | `gui/**`, `core/gui/**`, `creativetab/**`, `ModConfigurationGui*`, `ConfigurationGuiFactory`, `Tags` |
+| Test cases | 288 |
+| Line coverage (JaCoCo, filtered) | 1041 / 1641 = **63.4 %** |
+| Branch coverage (filtered) | 371 / 584 = **63.5 %** |
+| Coverage gate | 55 % line / 55 % branch + per-package rules (8.4 / 8.5 points below actual) |
+| Excluded from the gate | only the client-only screens: `GuiSolarPanel`, `core.gui.BaseModGui`, the two config-GUI classes, `client/**`, `creativetab/**`, `Tags` |
 | Server game-test checks | **158 / 158** passing (`./gradlew gameTestServer`) |
 | Client game-test checks | **6 / 6** passing (`./gradlew runClient -PgameTest`) |
 | Game-test coverage (separate report, server run) | 922 / 1481 lines = **62.3 %**, branches 40.2 % |
@@ -694,34 +694,43 @@ Ordered by value ÷ effort for a 1.7.10 RF mod. All of these are small enough to
 | `core.gui.BaseModContainer` | excluded | Same | **P0** (I4) |
 | `ModBlocks` / `ModItems` / `ModRecipes` | 0 % unit / 98 % game | Forge registries | Keep in game test |
 
+**Status:** most of the P0/P1 holes are closed. The containers and `BaseModContainer` are measured and
+gated (63 %/82 %), `TraversalEnergyDispenserModule` has a test class, the config loaders run through
+the `ConfigSource` seam, `SolarPanelBlock` and `SolarPanelTileEntity` are covered by the block/sun/Panel
+tests, and the tooltips and the wrench helper have tests. The unit report is now thin only on the
+Forge-registration layer (`init`, `init.recipes`, the mod entry point) and `core.tileentity` (61 %);
+the game test covers the former. The table above is the original analysis.
+
 ### 6.2 Harness changes that unlock the tests
 
-These are prerequisites; do them first.
+**Status:** the world builder, the deterministic tick alignment, the narrowed exclusion and the
+per-package rules are done. Still open: the `SolarFluxTestBase`/`TestPanel` builders (the suite works
+and each class is explicit about its setup) and seed control for `Utils.RANDOM`.
 
 * **`SolarFluxTestBase`** with a `@Before` that calls `applyDefaultConfiguration()`,
   `installUpgradeItems()` and `disableAutoBalance()`, and an `@After` that resets
   `mSolarPanelHeight`/`mConnectedTextures`. Today every test repeats the first three lines and a
   forgotten reset silently leaks into the next class in the same JVM.
-* **`TestWorld` builder**: a `mock(World.class)` with `provider` set (needed by `EntityItem`), plus
-  helpers for `getTileEntity(x,y,z)`, `canBlockSeeTheSky`, `getCelestialAngleRadians`,
-  `isRaining`, `isThundering`, `getTotalWorldTime`, `getWorldTime`. The sun tests then read like a
-  table instead of 20 lines of stubbing each.
-* **Deterministic tick alignment** (T1): `mTickShift` is a final field filled from the global
-  `Utils.RANDOM` in the constructor, so every `atTickRate` test loops to find a matching world time.
-  Add a package-private `setTickShift(short)` (or make the field non-final and expose it through a
-  `@VisibleForTesting` setter) and pin it in tests. This also makes the sun tests deterministic.
+* **`TestWorld` builder** — **done** (`support/TestWorld`): mocked world with provider, sky, celestial
+  angle, weather and tick alignment.
+* **Deterministic tick alignment** (T1) — **done without a production setter**: `TestWorld.alignedTo(panel, rate)`
+  reads the panel's shift and picks a matching total time, so no `@VisibleForTesting` field was needed.
 * **`TestPanel` builder**: `(tier, world, x, y, z, upgrades…)` one-liner.
-* **Narrow the JaCoCo exclusion**: measure `gui.ContainerSolarPanel`, `gui.SlotUpgrade`,
-  `core.gui.BaseModContainer` (they are plain Java, no LWJGL). Exclude only `GuiSolarPanel`,
-  `core.gui.BaseModGui`, the two config-GUI classes and `creativetab`. This makes I1–I4 visible to the
-  gate and stops them regressing.
-* **Per-package JaCoCo rules** instead of one bundle-wide ratio. A 2,000-line uncovered class can
-  currently hide behind the 46 % average. Suggested: `blocks` ≥ 65 %, `blocks.modules` ≥ 70 %,
-  `core.*` ≥ 85 %, `items` ≥ 80 %, `config` ≥ 70 %, plus the existing overall floor.
+* **Narrow the JaCoCo exclusion** — **done**: only the client-only screens are excluded; the containers
+  and their base class are measured and gated.
+* **Per-package JaCoCo rules** — **done** (55/55 bundle floor plus `blocks`/`modules`/`core.*` ≥ 90, `items` ≥ 85,
+  `config` ≥ 70, `gui` ≥ 60, `core.gui` ≥ 80).
 * **Seed control for `Utils.RANDOM`**: make it a `protected static`/settable field so a test can
   reproduce a "random" failure.
 
 ### 6.3 New / extended unit tests
+
+**Status:** items 1–17, 19–37, 39–47 and 51–54 are implemented across the classes listed in §1.1 plus
+`SunIntensityTest`, `UpgradeMathTest`, `SolarPanelSunTest`, `PanelEnergyTest`, `PanelUpgradesTest`,
+`PanelSyncTest`, `ModConfigurationLoadTest`, `LangIntegrityTest` and `GuiHandlerTest`. Remaining: 18
+(the tick-shift setter is unnecessary now that `TestWorld` pins the time), 38 (an `ItemStack` round
+trip cannot work in a unit test because items are unregistered — the game test covers it) and 49–50
+(the shift-held tooltip needs a seam for the LWJGL call).
 
 Grouped by file; the names are suggestions, the assertions are the point. The entries marked
 **regression** encode the defects above; most of them fail on today's code and become the proof that
@@ -859,6 +868,12 @@ the fix holds.
 
 ### 6.4 Game-test additions (`src/gameTest`)
 
+**Status:** the game test already covers registration/names, recipe presence, placement, the noon
+generation check, energy transfer, the NBT round trip, the runtime reload, wrench handling and the
+tier gap. Still open from this list: 56 (upgrades through the inventory at runtime), 57 (traversal
+chain), 58 (energy sharing), 59 (dismantle → place round trip), 60 (furnace), 61 (recipe content) and
+64 (sync keys).
+
 These cover the parts a unit test genuinely cannot. The current suite is good; the gaps are the
 behaviours that were just found:
 
@@ -901,9 +916,7 @@ behaviours that were just found:
   it needs a display. On CI that means `xvfb-run` plus a software GL stack (Mesa/llvmpipe); it is not
   wired into `game-test.yml` yet because that setup is unverified here. Run it locally or on a
   self-hosted runner with a GPU.
-* Raise the JaCoCo floor. Measured baseline is 52.3/59.9 with a 46/50 gate; set the floor to the
-  measured value minus ~1 point, and add the per-package rules from §6.2 so a single huge uncovered
-  class cannot hide.
+* Raise the JaCoCo floor — **done**: 55/55 bundle floor plus the per-package rules from §6.2.
 * Add `jacocoTestReport` as a dependency of `check` (currently only `jacocoTestCoverageVerification`
   is wired), so the HTML is always fresh after `./gradlew check`.
 * Consider `diff-cover` (or a `jacocoTestCoverageVerification` rule on new classes) in PR CI: the
@@ -931,6 +944,9 @@ Expect the filtered unit coverage to land around **65–70 % line / 65 % branch*
 which is a defensible place to raise the floor. The remaining 30 % is the recipe registrars, the
 registration classes, the mod entry point and the rendering/config GUI code — all of which need a
 Forge launch or a booted client, and the game test is the right home for them.
+
+**Status:** waves 0–4 are done (288 unit tests, 63.4 % line / 63.5 % branch, with the bundle floor at
+55/55 and per-package rules). Wave 5 is partially open; §6.4 lists the remaining scenarios.
 
 ---
 

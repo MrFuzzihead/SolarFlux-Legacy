@@ -165,6 +165,32 @@ public class ContainerSolarPanelTest {
     }
 
     @Test
+    public void shiftClickingMergesIntoAnExistingUpgradeStackBeforeAnEmptySlot() {
+        UpgradeItem upgrade = TestFixture.newUpgrade("upgradeEfficiency", 8);
+        mPanel.setInventorySlotContents(0, new ItemStack(upgrade, 3));
+        mPlayerInventory.mainInventory[9] = new ItemStack(upgrade, 2);
+
+        assertNotNull(mContainer.transferStackInSlot(null, FIRST_PLAYER_SLOT));
+
+        assertEquals(5, mPanel.getStackInSlot(0).stackSize);
+        assertNull(mPanel.getStackInSlot(1));
+        assertNull(mPlayerInventory.mainInventory[9]);
+    }
+
+    @Test
+    public void theMergeNeverExceedsTheSlotStackLimit() {
+        UpgradeItem upgrade = TestFixture.newUpgrade("upgradeBig", 100);
+        mPanel.setInventorySlotContents(0, new ItemStack(upgrade, 63));
+        mPlayerInventory.mainInventory[9] = new ItemStack(upgrade, 5);
+
+        assertNotNull(mContainer.transferStackInSlot(null, FIRST_PLAYER_SLOT));
+
+        assertEquals(64, mPanel.getStackInSlot(0).stackSize);
+        assertEquals(4, mPanel.getStackInSlot(1).stackSize);
+        assertNull(mPlayerInventory.mainInventory[9]);
+    }
+
+    @Test
     public void upgradeSlotsCannotBeDragFilled() {
         for (int slot = 0; slot < SolarPanelTileEntity.INVENTORY_SIZE; ++slot) {
             assertFalse("slot " + slot, mContainer.canDragIntoSlot(mContainer.getSlot(slot)));

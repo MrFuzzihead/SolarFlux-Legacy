@@ -15,7 +15,9 @@ import static org.mockito.Mockito.when;
 import net.minecraft.client.renderer.texture.IIconRegister;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.IChatComponent;
 import net.minecraft.util.IIcon;
 import net.minecraft.world.IBlockAccess;
 import net.minecraft.world.World;
@@ -30,6 +32,7 @@ import com.mrfuzzihead.solarflux.core.block.icon.TopIconHandler;
 import com.mrfuzzihead.solarflux.init.ModItems;
 import com.mrfuzzihead.solarflux.reference.NBTConstants;
 import com.mrfuzzihead.solarflux.support.TestFixture;
+import com.mrfuzzihead.solarflux.utility.Lang;
 
 public class SolarPanelBlockTest {
 
@@ -284,6 +287,68 @@ public class SolarPanelBlockTest {
                 .getTagCompound()
                 .getInteger(NBTConstants.ENERGY));
         assertEquals(0, panel.getFurnaceEnergyBuffer());
+    }
+
+    @Test
+    public void dismantlingHonoursTheKeepEnergyAndKeepInventoryFlags() {
+        for (boolean keepEnergy : new boolean[] { true, false }) {
+            for (boolean keepInventory : new boolean[] { true, false }) {
+                TestFixture.setStatic(ModConfiguration.class, "mKeepEnergyWhenDismantled", keepEnergy);
+                TestFixture.setStatic(ModConfiguration.class, "mKeepInventoryWhenDismantled", keepInventory);
+
+                World world = mock(World.class);
+                TestFixture
+                    .setInstanceField(world, World.class, "provider", mock(net.minecraft.world.WorldProvider.class));
+                SolarPanelTileEntity panel = new SolarPanelTileEntity(0);
+                panel.setEnergyStored(500);
+                panel.setInventorySlotContents(0, TestFixture.stack(ModItems.mUpgradeCapacity, 1, 0));
+                when(world.getTileEntity(1, 2, 3)).thenReturn(panel);
+                org.mockito.ArgumentCaptor<net.minecraft.entity.item.EntityItem> captor = org.mockito.ArgumentCaptor
+                    .forClass(net.minecraft.entity.item.EntityItem.class);
+
+                dismantle(world, 1, 2, 3);
+
+                verify(world).spawnEntityInWorld(captor.capture());
+                NBTTagCompound tag = captor.getValue()
+                    .getEntityItem()
+                    .getTagCompound();
+                String context = "keepEnergy=" + keepEnergy + " keepInventory=" + keepInventory;
+
+                if (keepEnergy) {
+                    assertNotNull(context, tag);
+                    assertEquals(context, 500, tag.getInteger(NBTConstants.ENERGY));
+                } else if (tag != null) {
+                    assertFalse(context, tag.hasKey(NBTConstants.ENERGY));
+                }
+                if (keepInventory) {
+                    assertNotNull(context, tag);
+                    assertTrue(context, tag.hasKey(NBTConstants.ITEMS));
+                } else if (tag != null) {
+                    assertFalse(context, tag.hasKey(NBTConstants.ITEMS));
+                }
+            }
+        }
+    }
+
+    @Test
+    public void sneakClickingWithInfoEnabledSendsTheChargeToChat() {
+        TestFixture.setStatic(ModConfiguration.class, "mInfoOnSneakClick", true);
+        World world = mock(World.class);
+        SolarPanelTileEntity panel = new SolarPanelTileEntity(0);
+        panel.setEnergyStored(1234);
+        when(world.getTileEntity(7, 8, 9)).thenReturn(panel);
+        EntityPlayer player = mock(EntityPlayer.class);
+        when(player.isSneaking()).thenReturn(true);
+        when(player.getCurrentEquippedItem()).thenReturn(null);
+        org.mockito.ArgumentCaptor<IChatComponent> captor = org.mockito.ArgumentCaptor.forClass(IChatComponent.class);
+
+        assertTrue(block.onBlockActivated(world, 7, 8, 9, player, 1, 0.5F, 0.5F, 0.5F));
+
+        verify(player).addChatMessage(captor.capture());
+        String message = captor.getValue()
+            .getUnformattedText();
+        assertTrue(message, message.contains(Lang.localise("energy.stored")));
+        assertTrue(message, message.contains("1,234"));
     }
 
     /**
