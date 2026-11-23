@@ -2,8 +2,6 @@ package com.mrfuzzihead.solarflux.core.utility;
 
 public enum Color {
 
-    BLACK("\u00a70"),
-    WHITE("\u00a7f"),
     GREY("\u00a77"),
     AQUA("\u00a7b"),
     GREEN("\u00a7a"),

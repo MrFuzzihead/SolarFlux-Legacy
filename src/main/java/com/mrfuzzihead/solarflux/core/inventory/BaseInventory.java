@@ -1,7 +1,5 @@
 package com.mrfuzzihead.solarflux.core.inventory;
 
-import static com.google.common.base.Preconditions.checkArgument;
-
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.item.ItemStack;
@@ -31,7 +29,9 @@ public class BaseInventory implements IInventory {
     }
 
     public void writeToNBT(NBTTagCompound pNBT) {
-        checkArgument(getSizeInventory() <= Byte.MAX_VALUE, "Inventory size too big.");
+        if (getSizeInventory() > Byte.MAX_VALUE) {
+            throw new IllegalArgumentException("Inventory size too big.");
+        }
         NBTTagList tagList = new NBTTagList();
         for (int i = 0; i < getSizeInventory(); ++i) {
             ItemStack itemStack = getStackInSlot(i);

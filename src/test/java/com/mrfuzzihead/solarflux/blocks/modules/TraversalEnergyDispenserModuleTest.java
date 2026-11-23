@@ -4,10 +4,10 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 
 import net.minecraft.item.ItemStack;
@@ -27,8 +27,8 @@ import com.mrfuzzihead.solarflux.support.TestFixture;
  *
  * <p>
  * The module is driven through {@code searchTargets()} directly instead of {@code tick()}, so the random
- * {@code mTickShift} of the panel cannot make the tests flaky. Each call advances the search by one block; the target
- * list is published at the start of the call that finds the queue empty.
+ * {@code mTickShift} of the panel cannot make the tests flaky. One call completes a whole sweep (up to the node
+ * budget); the target list is published at the start of the call that finds the queue empty.
  * </p>
  */
 public class TraversalEnergyDispenserModuleTest {
@@ -71,11 +71,6 @@ public class TraversalEnergyDispenserModuleTest {
         }
     }
 
-    @SuppressWarnings("unchecked")
-    private Collection<BlockPosition> queuedBlocks() {
-        return (Collection<BlockPosition>) TestFixture.getField(mModule, "mBlocksToVisit");
-    }
-
     private static BlockPosition position(int pX, int pY, int pZ) {
         return new BlockPosition(pX, pY, pZ);
     }
@@ -91,24 +86,37 @@ public class TraversalEnergyDispenserModuleTest {
     }
 
     /**
-     * Regression: the north-east diagonal was queued twice because {@code discoverNeighbors} only checked the visited
-     * set, which is filled when a block is popped.
+     * Regression: the north-east diagonal was validated (a world lookup) twice because {@code discoverNeighbors} only
+     * checked the visited set, which is filled when a block is popped.
      */
     @Test
-    public void theSearchNeverQueuesTheSamePositionTwice() {
+    public void aBlockReachableFromTwoParentsIsValidatedOnce() {
         installTraversalUpgrades(1);
         placeDiamond();
 
-        // Round one visits the north neighbour, round two the east one; both discover the diagonal.
-        runSearch(2);
+        runSearch(1);
 
-        Collection<BlockPosition> queue = queuedBlocks();
-        assertEquals("only the diagonal is still pending", 1, queue.size());
-        assertEquals("the queue holds no duplicates", 1, new HashSet<>(queue).size());
+        verify(mWorld, times(1)).getTileEntity(X + 1, Y, Z - 1);
+    }
+
+    @Test
+    public void oneRefreshCompletesTheWholeSweep() {
+        installTraversalUpgrades(1);
+        putReceiver(X + 1, Y, Z);
+        putReceiver(X + 2, Y, Z);
+
+        runSearch(1);
+        assertTrue(
+            "the first call publishes the previous (empty) sweep",
+            mModule.getTargets()
+                .isEmpty());
+
+        // One more call publishes the sweep that was completed entirely in the previous call.
+        runSearch(1);
         assertEquals(
-            position(X + 1, Y, Z - 1),
-            queue.iterator()
-                .next());
+            2,
+            mModule.getTargets()
+                .size());
     }
 
     @Test
@@ -154,6 +162,28 @@ public class TraversalEnergyDispenserModuleTest {
             2,
             mModule.getTargets()
                 .size());
+    }
+
+    @Test
+    public void aRepublishedTargetListDropsTheResolvedTileEntities() {
+        installTraversalUpgrades(1);
+        TestEnergyReceiverTileEntity first = new TestEnergyReceiverTileEntity();
+        when(mWorld.getTileEntity(X + 1, Y, Z)).thenReturn(first);
+        mPanel.setEnergyStored(1000);
+
+        runSearch(2);
+        mModule.sendEnergyToTargets();
+        assertEquals(16, first.getReceived());
+
+        TestEnergyReceiverTileEntity second = new TestEnergyReceiverTileEntity();
+        when(mWorld.getTileEntity(X + 1, Y, Z)).thenReturn(second);
+
+        // The search publishes the same position again; the cache must be dropped with it.
+        runSearch(2);
+        mModule.sendEnergyToTargets();
+
+        assertEquals(16, first.getReceived());
+        assertEquals(16, second.getReceived());
     }
 
     @Test

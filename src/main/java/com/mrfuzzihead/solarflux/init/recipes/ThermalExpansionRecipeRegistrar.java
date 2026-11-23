@@ -2,6 +2,7 @@ package com.mrfuzzihead.solarflux.init.recipes;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Objects;
 
 import net.minecraft.init.Items;
 import net.minecraft.item.ItemStack;
@@ -10,7 +11,6 @@ import net.minecraftforge.fluids.FluidRegistry;
 import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.oredict.ShapedOreRecipe;
 
-import com.google.common.base.Preconditions;
 import com.mrfuzzihead.solarflux.SolarFluxMod;
 import com.mrfuzzihead.solarflux.init.ModBlocks;
 import com.mrfuzzihead.solarflux.init.ModItems;
@@ -68,8 +68,8 @@ public class ThermalExpansionRecipeRegistrar extends VanillaRecipeRegistrar {
     @Override
     protected void registerSolarPanel1() {
         try {
-            ItemStack powerCoilGold = Preconditions
-                .checkNotNull(GameRegistry.findItemStack(Reference.THERMAL_EXPANSION_MOD_ID, "powerCoilGold", 1));
+            ItemStack powerCoilGold = Objects
+                .requireNonNull(GameRegistry.findItemStack(Reference.THERMAL_EXPANSION_MOD_ID, "powerCoilGold", 1));
             GameRegistry.addRecipe(
                 new ShapedOreRecipe(
                     ModBlocks.getSolarPanels()
@@ -83,8 +83,7 @@ public class ThermalExpansionRecipeRegistrar extends VanillaRecipeRegistrar {
                     'c',
                     powerCoilGold));
         } catch (NullPointerException e) {
-            SolarFluxMod.log.info("Failed to register %s recipe. Cause: %s", Reference.THERMAL_EXPANSION_MOD_ID, e);
-            e.printStackTrace();
+            SolarFluxMod.log.warn("Failed to register {} recipe.", Reference.THERMAL_EXPANSION_MOD_ID, e);
             super.registerSolarPanel1();
         }
     }
@@ -92,10 +91,10 @@ public class ThermalExpansionRecipeRegistrar extends VanillaRecipeRegistrar {
     @Override
     protected void registerSolarPanel2() {
         try {
-            ItemStack frameMachineBasic = Preconditions
-                .checkNotNull(GameRegistry.findItemStack(Reference.THERMAL_EXPANSION_MOD_ID, "frameMachineBasic", 1));
-            ItemStack cellBasic = Preconditions
-                .checkNotNull(GameRegistry.findItemStack(Reference.THERMAL_EXPANSION_MOD_ID, "frameCellBasic", 1));
+            ItemStack frameMachineBasic = Objects
+                .requireNonNull(GameRegistry.findItemStack(Reference.THERMAL_EXPANSION_MOD_ID, "frameMachineBasic", 1));
+            ItemStack cellBasic = Objects
+                .requireNonNull(GameRegistry.findItemStack(Reference.THERMAL_EXPANSION_MOD_ID, "frameCellBasic", 1));
             GameRegistry.addRecipe(
                 new ShapedOreRecipe(
                     ModBlocks.getSolarPanels()
@@ -113,8 +112,7 @@ public class ThermalExpansionRecipeRegistrar extends VanillaRecipeRegistrar {
                     'b',
                     cellBasic));
         } catch (NullPointerException e) {
-            SolarFluxMod.log.info("Failed to register %s recipe. Cause: %s", Reference.THERMAL_EXPANSION_MOD_ID, e);
-            e.printStackTrace();
+            SolarFluxMod.log.warn("Failed to register {} recipe.", Reference.THERMAL_EXPANSION_MOD_ID, e);
             super.registerSolarPanel2();
         }
     }
@@ -122,10 +120,10 @@ public class ThermalExpansionRecipeRegistrar extends VanillaRecipeRegistrar {
     @Override
     protected void registerSolarPanel3() {
         try {
-            ItemStack frameMachineHardened = Preconditions.checkNotNull(
+            ItemStack frameMachineHardened = Objects.requireNonNull(
                 GameRegistry.findItemStack(Reference.THERMAL_EXPANSION_MOD_ID, "frameMachineHardened", 1));
-            ItemStack cellHardened = Preconditions
-                .checkNotNull(GameRegistry.findItemStack(Reference.THERMAL_EXPANSION_MOD_ID, "frameCellHardened", 1));
+            ItemStack cellHardened = Objects
+                .requireNonNull(GameRegistry.findItemStack(Reference.THERMAL_EXPANSION_MOD_ID, "frameCellHardened", 1));
             GameRegistry.addRecipe(
                 new ShapedOreRecipe(
                     ModBlocks.getSolarPanels()
@@ -143,8 +141,7 @@ public class ThermalExpansionRecipeRegistrar extends VanillaRecipeRegistrar {
                     'b',
                     cellHardened));
         } catch (NullPointerException e) {
-            SolarFluxMod.log.info("Failed to register %s recipe. Cause: %s", Reference.THERMAL_EXPANSION_MOD_ID, e);
-            e.printStackTrace();
+            SolarFluxMod.log.warn("Failed to register {} recipe.", Reference.THERMAL_EXPANSION_MOD_ID, e);
             super.registerSolarPanel3();
         }
     }
@@ -152,9 +149,9 @@ public class ThermalExpansionRecipeRegistrar extends VanillaRecipeRegistrar {
     @Override
     protected void registerSolarPanel4() {
         try {
-            ItemStack frameMachineReinforced = Preconditions.checkNotNull(
+            ItemStack frameMachineReinforced = Objects.requireNonNull(
                 GameRegistry.findItemStack(Reference.THERMAL_EXPANSION_MOD_ID, "frameMachineReinforced", 1));
-            ItemStack cellReinforced = Preconditions.checkNotNull(
+            ItemStack cellReinforced = Objects.requireNonNull(
                 GameRegistry.findItemStack(Reference.THERMAL_EXPANSION_MOD_ID, "frameCellReinforcedFull", 1));
             GameRegistry.addRecipe(
                 new ShapedOreRecipe(
@@ -173,8 +170,7 @@ public class ThermalExpansionRecipeRegistrar extends VanillaRecipeRegistrar {
                     'b',
                     cellReinforced));
         } catch (NullPointerException e) {
-            SolarFluxMod.log.info("Failed to register %s recipe. Cause: %s", Reference.THERMAL_EXPANSION_MOD_ID, e);
-            e.printStackTrace();
+            SolarFluxMod.log.warn("Failed to register {} recipe.", Reference.THERMAL_EXPANSION_MOD_ID, e);
             super.registerSolarPanel4();
         }
     }
@@ -182,9 +178,9 @@ public class ThermalExpansionRecipeRegistrar extends VanillaRecipeRegistrar {
     @Override
     protected void registerSolarPanel5() {
         try {
-            ItemStack frameMachineResonant = Preconditions.checkNotNull(
+            ItemStack frameMachineResonant = Objects.requireNonNull(
                 GameRegistry.findItemStack(Reference.THERMAL_EXPANSION_MOD_ID, "frameMachineResonant", 1));
-            ItemStack cellResonant = Preconditions.checkNotNull(
+            ItemStack cellResonant = Objects.requireNonNull(
                 GameRegistry.findItemStack(Reference.THERMAL_EXPANSION_MOD_ID, "frameCellResonantFull", 1));
             GameRegistry.addRecipe(
                 new ShapedOreRecipe(
@@ -203,8 +199,7 @@ public class ThermalExpansionRecipeRegistrar extends VanillaRecipeRegistrar {
                     'b',
                     cellResonant));
         } catch (NullPointerException e) {
-            SolarFluxMod.log.info("Failed to register %s recipe. Cause: %s", Reference.THERMAL_EXPANSION_MOD_ID, e);
-            e.printStackTrace();
+            SolarFluxMod.log.warn("Failed to register {} recipe.", Reference.THERMAL_EXPANSION_MOD_ID, e);
             super.registerSolarPanel5();
         }
     }
@@ -212,9 +207,9 @@ public class ThermalExpansionRecipeRegistrar extends VanillaRecipeRegistrar {
     @Override
     protected void registerSolarPanel(int pTier) {
         try {
-            ItemStack powerCoilElectrum = Preconditions
-                .checkNotNull(GameRegistry.findItemStack(Reference.THERMAL_EXPANSION_MOD_ID, "powerCoilElectrum", 1));
-            ItemStack cellResonant = Preconditions.checkNotNull(
+            ItemStack powerCoilElectrum = Objects
+                .requireNonNull(GameRegistry.findItemStack(Reference.THERMAL_EXPANSION_MOD_ID, "powerCoilElectrum", 1));
+            ItemStack cellResonant = Objects.requireNonNull(
                 GameRegistry.findItemStack(Reference.THERMAL_EXPANSION_MOD_ID, "frameCellResonantFull", 1));
             GameRegistry.addRecipe(
                 new ShapedOreRecipe(
@@ -233,8 +228,7 @@ public class ThermalExpansionRecipeRegistrar extends VanillaRecipeRegistrar {
                     'b',
                     cellResonant));
         } catch (NullPointerException e) {
-            SolarFluxMod.log.info("Failed to register %s recipe. Cause: %s", Reference.THERMAL_EXPANSION_MOD_ID, e);
-            e.printStackTrace();
+            SolarFluxMod.log.warn("Failed to register {} recipe.", Reference.THERMAL_EXPANSION_MOD_ID, e);
             super.registerSolarPanel(pTier);
         }
     }
@@ -242,8 +236,8 @@ public class ThermalExpansionRecipeRegistrar extends VanillaRecipeRegistrar {
     @Override
     protected void registerUpgradeTransferRate() {
         try {
-            ItemStack powerCoilGold = Preconditions
-                .checkNotNull(GameRegistry.findItemStack(Reference.THERMAL_EXPANSION_MOD_ID, "powerCoilGold", 1));
+            ItemStack powerCoilGold = Objects
+                .requireNonNull(GameRegistry.findItemStack(Reference.THERMAL_EXPANSION_MOD_ID, "powerCoilGold", 1));
             GameRegistry.addRecipe(
                 new ShapedOreRecipe(
                     ModItems.mUpgradeTransferRate,
@@ -257,8 +251,7 @@ public class ThermalExpansionRecipeRegistrar extends VanillaRecipeRegistrar {
                     'c',
                     powerCoilGold));
         } catch (NullPointerException e) {
-            SolarFluxMod.log.info("Failed to register %s recipe. Cause: %s", Reference.THERMAL_EXPANSION_MOD_ID, e);
-            e.printStackTrace();
+            SolarFluxMod.log.warn("Failed to register {} recipe.", Reference.THERMAL_EXPANSION_MOD_ID, e);
             super.registerUpgradeTransferRate();
         }
     }
@@ -266,8 +259,8 @@ public class ThermalExpansionRecipeRegistrar extends VanillaRecipeRegistrar {
     @Override
     protected void registerUpgradeCapacity() {
         try {
-            ItemStack cellBasic = Preconditions
-                .checkNotNull(GameRegistry.findItemStack(Reference.THERMAL_EXPANSION_MOD_ID, "cellBasic", 1));
+            ItemStack cellBasic = Objects
+                .requireNonNull(GameRegistry.findItemStack(Reference.THERMAL_EXPANSION_MOD_ID, "cellBasic", 1));
             GameRegistry.addRecipe(
                 new ShapedOreRecipe(
                     ModItems.mUpgradeCapacity,
@@ -281,8 +274,7 @@ public class ThermalExpansionRecipeRegistrar extends VanillaRecipeRegistrar {
                     'c',
                     cellBasic));
         } catch (NullPointerException e) {
-            SolarFluxMod.log.info("Failed to register %s recipe. Cause: %s", Reference.THERMAL_EXPANSION_MOD_ID, e);
-            e.printStackTrace();
+            SolarFluxMod.log.warn("Failed to register {} recipe.", Reference.THERMAL_EXPANSION_MOD_ID, e);
             super.registerUpgradeCapacity();
         }
     }
@@ -296,8 +288,7 @@ public class ThermalExpansionRecipeRegistrar extends VanillaRecipeRegistrar {
             method.invoke(null, pEnergy, pPrimaryInput, pSecondaryInput, pOutput);
         } catch (ClassNotFoundException | NoSuchMethodException | InvocationTargetException
             | IllegalAccessException e) {
-            SolarFluxMod.log.info("Failed to register %s smelter recipe.", Reference.THERMAL_EXPANSION_MOD_ID);
-            e.printStackTrace();
+            SolarFluxMod.log.warn("Failed to register {} smelter recipe.", Reference.THERMAL_EXPANSION_MOD_ID);
             return false;
         }
         return true;
@@ -316,7 +307,6 @@ public class ThermalExpansionRecipeRegistrar extends VanillaRecipeRegistrar {
             method.invoke(null, pEnergy, pInput, pOutput, pFluid, false);
         } catch (ClassNotFoundException | NoSuchMethodException | InvocationTargetException
             | IllegalAccessException e) {
-            e.printStackTrace();
             return false;
         }
         return true;

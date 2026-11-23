@@ -1,8 +1,10 @@
 package com.mrfuzzihead.solarflux;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import com.mrfuzzihead.solarflux.blocks.SolarPanelTileEntity;
 import com.mrfuzzihead.solarflux.config.ModConfiguration;
-import com.mrfuzzihead.solarflux.core.utility.LogHelper;
 import com.mrfuzzihead.solarflux.gui.GuiHandler;
 import com.mrfuzzihead.solarflux.init.ModBlocks;
 import com.mrfuzzihead.solarflux.init.ModItems;
@@ -31,13 +33,17 @@ public class SolarFluxMod {
     @Mod.Instance(Reference.MOD_ID)
     public static SolarFluxMod mInstance;
 
-    public static final LogHelper log = new LogHelper(Reference.MOD_ID);
+    public static final Logger log = LogManager.getLogger(Reference.MOD_ID);
 
     @EventHandler
     public void preInit(FMLPreInitializationEvent pEvent) {
         log.info("Pre Initialization");
         ModConfiguration.initialize(pEvent.getSuggestedConfigurationFile());
+        // Legacy id first, canonical id last: TileEntity.writeToNBT uses the last mapping, so new chunks are namespaced
+        // while old chunks (saved as "solar") still resolve to the same class. The registry accepts one class under
+        // several ids as long as the ids differ.
         GameRegistry.registerTileEntity(SolarPanelTileEntity.class, "solar");
+        GameRegistry.registerTileEntity(SolarPanelTileEntity.class, "solarflux:solar");
         ModBlocks.initialize();
         ModItems.initialize();
     }

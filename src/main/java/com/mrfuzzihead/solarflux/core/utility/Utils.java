@@ -8,9 +8,8 @@ import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.world.World;
 
-import org.lwjgl.input.Keyboard;
-
 import buildcraft.api.tools.IToolWrench;
+import cofh.api.item.IToolHammer;
 import cpw.mods.fml.common.ModAPIManager;
 
 public final class Utils {
@@ -46,6 +45,12 @@ public final class Utils {
         if (tool != null) {
             if (ModAPIManager.INSTANCE.hasAPI("BuildCraftAPI|tools") && tool.getItem() instanceof IToolWrench
                 && ((IToolWrench) tool.getItem()).canWrench(pPlayer, pX, pY, pZ)) {
+                return true;
+            }
+            // CoFH Core is a hard dependency, so its hammer API is always available. This covers the Thermal
+            // Expansion hammer, which is what most packs use to rotate and dismantle machines.
+            if (tool.getItem() instanceof IToolHammer
+                && ((IToolHammer) tool.getItem()).isUsable(tool, pPlayer, pX, pY, pZ)) {
                 return true;
             }
         }
@@ -88,9 +93,5 @@ public final class Utils {
             }
         }
         return false;
-    }
-
-    public static boolean isShiftKeyDown() {
-        return Keyboard.isKeyDown(Keyboard.KEY_LSHIFT) || Keyboard.isKeyDown(Keyboard.KEY_RSHIFT);
     }
 }

@@ -5,17 +5,29 @@ public final class TierConfiguration {
     private final int mMaximumEnergyGeneration;
     private final int mMaximumEnergyTransfer;
     private final int mCapacity;
+    private final boolean mActive;
 
     TierConfiguration(int pMaximumEnergyGeneration, int pMaximumEnergyTransfer, int pCapacity) {
-        mMaximumEnergyGeneration = pMaximumEnergyGeneration;
-        mMaximumEnergyTransfer = pMaximumEnergyTransfer;
-        mCapacity = pCapacity;
+        this(pMaximumEnergyGeneration, pMaximumEnergyTransfer, pCapacity, true);
     }
 
     TierConfiguration(int pMaximumEnergyGeneration, int pCapacity) {
+        this(pMaximumEnergyGeneration, pMaximumEnergyGeneration * 8, pCapacity, true);
+    }
+
+    TierConfiguration(int pMaximumEnergyGeneration, int pMaximumEnergyTransfer, int pCapacity, boolean pActive) {
         mMaximumEnergyGeneration = pMaximumEnergyGeneration;
-        mMaximumEnergyTransfer = pMaximumEnergyGeneration * 8;
+        mMaximumEnergyTransfer = pMaximumEnergyTransfer;
         mCapacity = pCapacity;
+        mActive = pActive;
+    }
+
+    /**
+     * Whether this tier can be crafted. Inactive tiers keep their block registered (so an existing world never loses
+     * it and the tier indexes stay aligned) but get no recipe and are hidden from the creative tab.
+     */
+    public boolean isActive() {
+        return mActive;
     }
 
     /**

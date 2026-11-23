@@ -1,18 +1,18 @@
 package com.mrfuzzihead.solarflux.core.item;
 
+import java.util.Objects;
+
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-
-import com.google.common.base.Preconditions;
 
 public class BaseModItem extends Item {
 
     private final String mModId;
 
     public BaseModItem(String pModId, String pName) {
-        mModId = Preconditions.checkNotNull(pModId)
+        mModId = Objects.requireNonNull(pModId)
             .toLowerCase();
-        setUnlocalizedName(Preconditions.checkNotNull(pName));
+        setUnlocalizedName(Objects.requireNonNull(pName));
     }
 
     public String getModId() {

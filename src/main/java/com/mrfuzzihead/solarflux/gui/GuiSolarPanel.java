@@ -1,6 +1,5 @@
 package com.mrfuzzihead.solarflux.gui;
 
-import net.minecraft.client.resources.I18n;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.ResourceLocation;
 
@@ -33,24 +32,26 @@ public class GuiSolarPanel extends BaseModGui {
     private static final int BORDER_OFFSET = 8;
 
     private final SolarPanelTileEntity mSolarPanelTileEntity;
-    private final InventoryPlayer mInventoryPlayer;
 
     public GuiSolarPanel(InventoryPlayer pInventoryPlayer, SolarPanelTileEntity pSolarPanelTileEntity) {
         super(new ContainerSolarPanel(pInventoryPlayer, pSolarPanelTileEntity));
         mSolarPanelTileEntity = pSolarPanelTileEntity;
-        mInventoryPlayer = pInventoryPlayer;
         xSize = 176;
         ySize = 180;
     }
 
+    /**
+     * The title above the player inventory. It is the panel's name, not the player's (whose inventory is always called
+     * "Inventory" and says nothing about the block that was opened). Extracted so the client game test can assert it
+     * without rendering.
+     */
+    public String getPanelTitle() {
+        return Lang.localise(mSolarPanelTileEntity.getInventoryName(), false);
+    }
+
     @Override
     protected void drawGuiContainerForegroundLayer(int pMouseX, int pMouseY) {
-        fontRendererObj.drawString(
-            mInventoryPlayer.hasCustomInventoryName() ? mInventoryPlayer.getInventoryName()
-                : I18n.format(mInventoryPlayer.getInventoryName()),
-            BORDER_OFFSET,
-            ySize - 96 + 2,
-            0x404040);
+        fontRendererObj.drawString(getPanelTitle(), BORDER_OFFSET, ySize - 96 + 2, 0x404040);
 
         fontRendererObj.drawString(
             String.format(

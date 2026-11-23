@@ -8,6 +8,7 @@ import net.minecraft.item.ItemStack;
 import net.minecraftforge.oredict.ShapedOreRecipe;
 
 import com.google.common.collect.Lists;
+import com.mrfuzzihead.solarflux.config.ModConfiguration;
 import com.mrfuzzihead.solarflux.init.ModBlocks;
 import com.mrfuzzihead.solarflux.init.ModItems;
 
@@ -32,33 +33,40 @@ public class VanillaRecipeRegistrar extends AbstractRecipeRegistrar {
 
     protected void registerSolarPanelRecipes() {
         if (ModBlocks.getSolarPanels()
-            .size() > 0) {
+            .size() > 0 && isTierActive(0)) {
             registerSolarPanel0();
         }
         if (ModBlocks.getSolarPanels()
-            .size() > 1) {
+            .size() > 1 && isTierActive(1)) {
             registerSolarPanel1();
         }
         if (ModBlocks.getSolarPanels()
-            .size() > 2) {
+            .size() > 2 && isTierActive(2)) {
             registerSolarPanel2();
         }
         if (ModBlocks.getSolarPanels()
-            .size() > 3) {
+            .size() > 3 && isTierActive(3)) {
             registerSolarPanel3();
         }
         if (ModBlocks.getSolarPanels()
-            .size() > 4) {
+            .size() > 4 && isTierActive(4)) {
             registerSolarPanel4();
         }
         if (ModBlocks.getSolarPanels()
-            .size() > 5) {
+            .size() > 5 && isTierActive(5)) {
             registerSolarPanel5();
         }
         for (int tier = 6; tier < ModBlocks.getSolarPanels()
             .size(); ++tier) {
-            registerSolarPanel(tier);
+            if (isTierActive(tier)) {
+                registerSolarPanel(tier);
+            }
         }
+    }
+
+    private static boolean isTierActive(int pTier) {
+        return ModConfiguration.getTierConfiguration(pTier)
+            .isActive();
     }
 
     protected void registerUpgradeRecipes() {

@@ -1,8 +1,6 @@
 package com.mrfuzzihead.solarflux.config;
 
 import net.minecraft.client.gui.GuiScreen;
-import net.minecraftforge.common.config.ConfigElement;
-import net.minecraftforge.common.config.Configuration;
 
 import com.mrfuzzihead.solarflux.reference.Reference;
 
@@ -13,9 +11,7 @@ public class ModConfigurationGui extends GuiConfig {
     public ModConfigurationGui(GuiScreen pGuiScreen) {
         super(
             pGuiScreen,
-            new ConfigElement(
-                ModConfiguration.getConfiguration()
-                    .getCategory(Configuration.CATEGORY_GENERAL)).getChildElements(),
+            ModConfiguration.getConfigGuiElements(),
             Reference.MOD_ID,
             true,
             true,

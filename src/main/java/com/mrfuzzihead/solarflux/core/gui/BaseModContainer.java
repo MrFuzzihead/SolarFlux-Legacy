@@ -21,17 +21,7 @@ public class BaseModContainer extends Container {
 
     protected static final int MOUSE_LEFT_CLICK = 0;
     protected static final int MOUSE_RIGHT_CLICK = 1;
-    protected static final int FAKE_SLOT_ID = -999;
     protected static final int CLICK_MODE_NORMAL = 0;
-    protected static final int CLICK_MODE_SHIFT = 1;
-    protected static final int CLICK_MODE_KEY = 2;
-    protected static final int CLICK_MODE_PICK_ITEM = 3;
-    protected static final int CLICK_MODE_OUTSIDE = 4;
-    protected static final int CLICK_DRAG_RELEASE = 5;
-    protected static final int CLICK_MODE_DOUBLE_CLICK = 6;
-    protected static final int CLICK_DRAG_MODE_PRE = 0;
-    protected static final int CLICK_DRAG_MODE_SLOT = 1;
-    protected static final int CLICK_DRAG_MODE_POST = 2;
     protected static final int PLAYER_INVENTORY_ROWS = 3;
     protected static final int PLAYER_INVENTORY_COLUMNS = 9;
     private final Map<Integer, Integer> mProgressBarValues = Maps.newHashMap();
@@ -140,7 +130,10 @@ public class BaseModContainer extends Container {
 
                 if (slot.isItemValid(pItemStack) && stackInSlot == null) {
                     ItemStack placedItemStack = pItemStack.copy();
-                    placedItemStack.stackSize = Math.min(pItemStack.stackSize, slot.getSlotStackLimit());
+                    // Vanilla caps at min(item max stack size, slot limit); the item max matters for tools and
+                    // anything else with an unstackable or smaller-than-64 limit.
+                    placedItemStack.stackSize = Math
+                        .min(pItemStack.stackSize, Math.min(pItemStack.getMaxStackSize(), slot.getSlotStackLimit()));
                     slot.putStack(placedItemStack);
                     slot.onSlotChanged();
 

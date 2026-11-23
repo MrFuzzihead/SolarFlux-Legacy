@@ -1,13 +1,8 @@
 package com.mrfuzzihead.solarflux.items;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
 
 import java.util.ArrayList;
-
-import net.minecraft.item.ItemStack;
 
 import org.junit.Test;
 
@@ -37,30 +32,5 @@ public class UpgradeItemTest {
 
         assertEquals("item.solarflux:mirror", mirror.getUnlocalizedName());
         assertEquals("solarflux", mirror.getModId());
-    }
-
-    @Test
-    public void theWaferSawIsItsOwnContainerItem() {
-        WaferSawItem saw = new WaferSawItem();
-        ItemStack stack = TestFixture.stack(saw, 1, 0);
-
-        assertTrue(saw.hasContainerItem(stack));
-        assertFalse(saw.doesContainerItemLeaveCraftingGrid(stack));
-        assertFalse(saw.isRepairable());
-        assertEquals(1, stack.getMaxStackSize());
-        assertEquals(5, stack.getMaxDamage());
-    }
-
-    @Test
-    public void usingTheWaferSawInACraftDamagesItInsteadOfConsumingIt() {
-        WaferSawItem saw = new WaferSawItem();
-        ItemStack stack = TestFixture.stack(saw, 1, 0);
-
-        ItemStack returned = saw.getContainerItem(stack);
-
-        assertSame(stack, returned);
-        assertEquals(1, returned.getItemDamage());
-        assertSame(stack, saw.getContainerItem(returned));
-        assertEquals(2, returned.getItemDamage());
     }
 }

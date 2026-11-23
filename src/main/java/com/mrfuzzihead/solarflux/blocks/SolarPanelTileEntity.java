@@ -1,7 +1,5 @@
 package com.mrfuzzihead.solarflux.blocks;
 
-import static com.google.common.base.Preconditions.checkState;
-
 import java.util.Map;
 
 import net.minecraft.entity.player.EntityPlayer;
@@ -9,12 +7,10 @@ import net.minecraft.inventory.IInventory;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
-import net.minecraft.util.MathHelper;
 import net.minecraftforge.common.util.ForgeDirection;
 
 import com.google.common.base.Objects;
 import com.google.common.collect.Maps;
-import com.google.common.collect.Range;
 import com.mrfuzzihead.solarflux.blocks.modules.EnergySharingModule;
 import com.mrfuzzihead.solarflux.blocks.modules.ITileEntityModule;
 import com.mrfuzzihead.solarflux.blocks.modules.SimpleEnergyDispenserModule;
@@ -33,7 +29,6 @@ import cofh.api.energy.IEnergyProvider;
 public class SolarPanelTileEntity extends BaseModTileEntitySynced implements IInventory, IEnergyProvider {
 
     public static final int INVENTORY_SIZE = 5;
-    public static final Range<Integer> UPGRADE_SLOTS = Range.closedOpen(0, INVENTORY_SIZE);
     /**
      * Random number to avoid having all panels performing costly operations during the same tick.
      */
@@ -65,6 +60,12 @@ public class SolarPanelTileEntity extends BaseModTileEntitySynced implements IIn
 
     private BaseInventory mInventory = new BaseInventory("container.solarflux.panel", INVENTORY_SIZE, this);
     private Map<Item, Integer> mUpgradeCache = Maps.newHashMap();
+    /** Snapshot of the slots the cache was built from, so an unrelated {@code markDirty} does not rebuild it. */
+    private final ItemStack[] mCachedSlotStacks = new ItemStack[INVENTORY_SIZE];
+    private final int[] mCachedSlotSizes = new int[INVENTORY_SIZE];
+    private boolean mUpgradeCacheValid;
+    private int mUpgradeCacheRebuilds;
+    private int mCachedConfigurationVersion = Integer.MIN_VALUE;
 
     public SolarPanelTileEntity() {
         // An empty constructor is always required as it is used when loading a TileEntity from NBT.
@@ -149,8 +150,10 @@ public class SolarPanelTileEntity extends BaseModTileEntitySynced implements IIn
         computeSunIntensity();
 
         double energyGeneration = getMaximumEnergyGeneration() * mSunIntensity;
-        energyGeneration *= (1 + ModConfiguration.getEfficiencyUpgradeIncrease() * Math
-            .pow(getUpgradeCount(ModItems.mUpgradeEfficiency), ModConfiguration.getEfficiencyUpgradeReturnsToScale()));
+        energyGeneration *= UpgradeMath.multiplier(
+            getUpgradeCount(ModItems.mUpgradeEfficiency),
+            ModConfiguration.getEfficiencyUpgradeIncrease(),
+            ModConfiguration.getEfficiencyUpgradeReturnsToScale());
 
         mCurrentEnergyGeneration = (int) Math.round(energyGeneration);
     }
@@ -170,31 +173,14 @@ public class SolarPanelTileEntity extends BaseModTileEntitySynced implements IIn
      * Compute the intensity of the sun that can be used by the Solar Panel.
      */
     private void computeSunIntensity() {
-        if (worldObj.canBlockSeeTheSky(xCoord, yCoord + 1, zCoord)) {
-            // Intensity based on the position of the sun.
-            float multiplicator = 1.5f - (getUpgradeCount(ModItems.mUpgradeLowLight) * 0.122f);
-            float displacement = 1.2f + (getUpgradeCount(ModItems.mUpgradeLowLight) * 0.08f);
-            // Celestial angle == 0 at zenith.
-            float celestialAngleRadians = worldObj.getCelestialAngleRadians(1.0f);
-            if (celestialAngleRadians > Math.PI) {
-                celestialAngleRadians = (2 * 3.141592f - celestialAngleRadians);
-            }
-
-            mSunIntensity = multiplicator * MathHelper.cos(celestialAngleRadians / displacement);
-            mSunIntensity = Math.max(0, mSunIntensity);
-            mSunIntensity = Math.min(1, mSunIntensity);
-
-            if (mSunIntensity > 0) {
-                if (worldObj.isRaining()) {
-                    mSunIntensity *= ModConfiguration.getRainGenerationFactor();
-                }
-                if (worldObj.isThundering()) {
-                    mSunIntensity *= ModConfiguration.getThunderGenerationFactor();
-                }
-            }
-        } else {
-            mSunIntensity = 0;
-        }
+        mSunIntensity = SunIntensity.calculate(
+            worldObj.canBlockSeeTheSky(xCoord, yCoord + 1, zCoord),
+            worldObj.getCelestialAngleRadians(1.0F),
+            worldObj.isRaining(),
+            worldObj.isThundering(),
+            getUpgradeCount(ModItems.mUpgradeLowLight),
+            ModConfiguration.getRainGenerationFactor(),
+            ModConfiguration.getThunderGenerationFactor());
     }
 
     protected void generateEnergy() {
@@ -209,6 +195,12 @@ public class SolarPanelTileEntity extends BaseModTileEntitySynced implements IIn
      * Goes through the inventory and counts the number of each upgrade.
      */
     private void refreshUpgradeCache() {
+        if (slotsMatchCache()) {
+            return;
+        }
+        rememberSlots();
+        ++mUpgradeCacheRebuilds;
+
         mUpgradeCache.clear();
         for (int i = 0; i < getSizeInventory(); ++i) {
             ItemStack itemStack = getStackInSlot(i);
@@ -233,19 +225,57 @@ public class SolarPanelTileEntity extends BaseModTileEntitySynced implements IIn
 
         // Apply effect of transfer rate upgrade.
         getEnergyStorage().setMaxTransfer(
-            (int) (ModConfiguration.getTierConfiguration(mTierIndex)
-                .getMaximumEnergyTransfer()
-                * (1 + ModConfiguration.getTransferRateUpgradeIncrease() * Math.pow(
-                    getUpgradeCount(ModItems.mUpgradeTransferRate),
-                    ModConfiguration.getTransferRateUpgradeReturnsToScale()))));
+            UpgradeMath.apply(
+                ModConfiguration.getTierConfiguration(mTierIndex)
+                    .getMaximumEnergyTransfer(),
+                getUpgradeCount(ModItems.mUpgradeTransferRate),
+                ModConfiguration.getTransferRateUpgradeIncrease(),
+                ModConfiguration.getTransferRateUpgradeReturnsToScale()));
 
         // Apply effect of capacity upgrade
         getEnergyStorage().setMaxEnergyStored(
-            (int) (ModConfiguration.getTierConfiguration(mTierIndex)
-                .getCapacity()
-                * (1 + ModConfiguration.getCapacityUpgradeIncrease() * Math.pow(
-                    getUpgradeCount(ModItems.mUpgradeCapacity),
-                    ModConfiguration.getCapacityUpgradeReturnsToScale()))));
+            UpgradeMath.apply(
+                ModConfiguration.getTierConfiguration(mTierIndex)
+                    .getCapacity(),
+                getUpgradeCount(ModItems.mUpgradeCapacity),
+                ModConfiguration.getCapacityUpgradeIncrease(),
+                ModConfiguration.getCapacityUpgradeReturnsToScale()));
+    }
+
+    /**
+     * True when every slot still holds the same stack (identity) with the same size. {@code markDirty()} is called for
+     * reasons unrelated to the inventory (saves, block updates), and a shift-click fires it once per merged slot; in
+     * both cases the cache would be rebuilt for nothing.
+     */
+    private boolean slotsMatchCache() {
+        if (!mUpgradeCacheValid || mCachedConfigurationVersion != ModConfiguration.getConfigurationVersion()) {
+            return false;
+        }
+        for (int i = 0; i < INVENTORY_SIZE; ++i) {
+            ItemStack stack = getStackInSlot(i);
+            if (stack != mCachedSlotStacks[i]) {
+                return false;
+            }
+            if (stack != null && stack.stackSize != mCachedSlotSizes[i]) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void rememberSlots() {
+        for (int i = 0; i < INVENTORY_SIZE; ++i) {
+            ItemStack stack = getStackInSlot(i);
+            mCachedSlotStacks[i] = stack;
+            mCachedSlotSizes[i] = stack == null ? 0 : stack.stackSize;
+        }
+        mUpgradeCacheValid = true;
+        mCachedConfigurationVersion = ModConfiguration.getConfigurationVersion();
+    }
+
+    /** Visible for tests: how many times the cache was actually rebuilt. */
+    int getUpgradeCacheRebuilds() {
+        return mUpgradeCacheRebuilds;
     }
 
     public int getTotalUpgradeInstalled() {
@@ -311,6 +341,36 @@ public class SolarPanelTileEntity extends BaseModTileEntitySynced implements IIn
     }
 
     /**
+     * The S35 packet only carries what the client displays. The five upgrade slots are deliberately absent: the
+     * container syncs the open GUI's slots itself, and a field of panels would otherwise ship every upgrade stack to
+     * every client on chunk load. The capacity is sent because the client can no longer derive it from the items.
+     */
+    @Override
+    protected void addSyncDataToNBT(NBTTagCompound pNBT) {
+        pNBT.setInteger(NBTConstants.TIER_INDEX, mTierIndex);
+        pNBT.setInteger(NBTConstants.ENERGY, getEnergyStored());
+        pNBT.setInteger(NBTConstants.SYNC_CAPACITY, getMaxEnergyStored());
+        pNBT.setInteger(NBTConstants.SYNC_GENERATION, mCurrentEnergyGeneration);
+        pNBT.setFloat(NBTConstants.SYNC_SUN_INTENSITY, mSunIntensity);
+    }
+
+    @Override
+    protected void loadSyncDataFromNBT(NBTTagCompound pNBT) {
+        mTierIndex = ModConfiguration.clampTierIndex(pNBT.getInteger(NBTConstants.TIER_INDEX));
+        int capacity = pNBT.getInteger(NBTConstants.SYNC_CAPACITY);
+        if (capacity <= 0) {
+            // A packet from a build that did not send the capacity yet: fall back to the tier's base value so the
+            // gauge never divides by zero.
+            capacity = ModConfiguration.getTierConfiguration(mTierIndex)
+                .getCapacity();
+        }
+        mEnergyStorage.setMaxEnergyStored(capacity);
+        mEnergyStorage.setEnergyStored(pNBT.getInteger(NBTConstants.ENERGY));
+        mCurrentEnergyGeneration = pNBT.getInteger(NBTConstants.SYNC_GENERATION);
+        mSunIntensity = pNBT.getFloat(NBTConstants.SYNC_SUN_INTENSITY);
+    }
+
+    /**
      * Returns true if this tick is a good one to perform an operation that is desired to run ar the provided rate.
      */
     public boolean atTickRate(int pDesiredTickRate) {
@@ -343,7 +403,9 @@ public class SolarPanelTileEntity extends BaseModTileEntitySynced implements IIn
         long v = pScale;
         v *= getEnergyStored();
         v /= getMaxEnergyStored();
-        checkState(v <= Integer.MAX_VALUE, "Integer overflow");
+        if (v > Integer.MAX_VALUE) {
+            throw new IllegalStateException("Integer overflow");
+        }
         // Stored energy can exceed the capacity after a capacity upgrade is removed; the gauge stays full instead of
         // overflowing its frame.
         return (int) Math.max(0, Math.min(v, pScale));

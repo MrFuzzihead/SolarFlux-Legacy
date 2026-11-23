@@ -243,6 +243,38 @@ public class StatefulEnergyStorageTest {
     }
 
     @Test
+    public void sendToIsCappedByTheGivenAmount() {
+        StatefulEnergyStorage storage = new StatefulEnergyStorage(1000, 1000);
+        storage.setEnergyStored(100);
+        IEnergyReceiver receiver = mock(IEnergyReceiver.class);
+        when(receiver.receiveEnergy(ForgeDirection.NORTH, 30, false)).thenReturn(30);
+
+        assertEquals(30, storage.sendTo(receiver, ForgeDirection.NORTH, 30));
+        assertEquals(70, storage.getEnergyStored());
+    }
+
+    @Test
+    public void sendToIsAlsoCappedByTheTransferRate() {
+        StatefulEnergyStorage storage = new StatefulEnergyStorage(1000, 1000, 10);
+        storage.setEnergyStored(100);
+        IEnergyReceiver receiver = mock(IEnergyReceiver.class);
+        when(receiver.receiveEnergy(ForgeDirection.NORTH, 10, false)).thenReturn(10);
+
+        assertEquals(10, storage.sendTo(receiver, ForgeDirection.NORTH, 30));
+        assertEquals(90, storage.getEnergyStored());
+    }
+
+    @Test
+    public void sendToTreatsANegativeCapAsZero() {
+        StatefulEnergyStorage storage = new StatefulEnergyStorage(1000, 1000);
+        storage.setEnergyStored(100);
+        IEnergyReceiver receiver = mock(IEnergyReceiver.class);
+
+        assertEquals(0, storage.sendTo(receiver, ForgeDirection.NORTH, -5));
+        assertEquals(100, storage.getEnergyStored());
+    }
+
+    @Test
     public void sendMaxToExtractsExactlyWhatTheReceiverAccepted() {
         StatefulEnergyStorage storage = new StatefulEnergyStorage(1000, 1000);
         storage.setEnergyStored(100);

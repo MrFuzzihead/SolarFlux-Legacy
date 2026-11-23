@@ -21,7 +21,7 @@ public abstract class AbstractRecipeRegistrar {
             if (knowsOre(name)) {
                 return name;
             }
-            SolarFluxMod.log.info("Unable to find %s for recipe.", name);
+            SolarFluxMod.log.info("Unable to find {} for recipe.", name);
         }
         throw new RuntimeException(
             String.format(

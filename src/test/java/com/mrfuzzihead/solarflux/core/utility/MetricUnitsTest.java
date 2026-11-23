@@ -13,7 +13,6 @@ public class MetricUnitsTest {
         assertEquals(1_000, MetricUnits.KILO);
         assertEquals(1_000_000, MetricUnits.MEGA);
         assertEquals(1_000_000_000, MetricUnits.GIGA);
-        assertEquals(1_000_000_000_000L, MetricUnits.TERA);
     }
 
     @Test

@@ -88,10 +88,20 @@ public class StatefulEnergyStorage implements IEnergyStorage {
     }
 
     /**
+     * Sends at most {@code pMax} energy to the receiver, further capped by the storage's transfer rate.
+     *
+     * @return the amount the receiver accepted, which is exactly the amount extracted
+     */
+    public int sendTo(IEnergyReceiver pEnergyReceiver, ForgeDirection pFrom, int pMax) {
+        int offered = Math.min(getMaxExtract(), Math.max(pMax, 0));
+        return extractEnergy(pEnergyReceiver.receiveEnergy(pFrom, offered, false), false);
+    }
+
+    /**
      * Sends the maximum amount of energy possible to the {@link IEnergyReceiver}
      */
     public int sendMaxTo(IEnergyReceiver pEnergyReceiver, ForgeDirection pFrom) {
-        return extractEnergy(pEnergyReceiver.receiveEnergy(pFrom, getMaxExtract(), false), false);
+        return sendTo(pEnergyReceiver, pFrom, Integer.MAX_VALUE);
     }
 
     /**

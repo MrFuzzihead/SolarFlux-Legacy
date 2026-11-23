@@ -1,6 +1,6 @@
 package com.mrfuzzihead.solarflux.core.block;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
@@ -17,9 +17,9 @@ public class BaseModBlock extends Block {
 
     public BaseModBlock(String pModId, String pName, IBlockIconHandler pBlockIconHandler) {
         super(Material.rock);
-        mModId = checkNotNull(pModId).toLowerCase();
-        mBlockIconHandler = checkNotNull(pBlockIconHandler);
-        setBlockName(checkNotNull(pName));
+        mModId = requireNonNull(pModId).toLowerCase();
+        mBlockIconHandler = requireNonNull(pBlockIconHandler);
+        setBlockName(requireNonNull(pName));
     }
 
     @Override

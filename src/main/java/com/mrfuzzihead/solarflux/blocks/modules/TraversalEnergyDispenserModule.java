@@ -1,11 +1,10 @@
 package com.mrfuzzihead.solarflux.blocks.modules;
 
-import java.util.LinkedList;
+import java.util.Iterator;
 import java.util.Set;
 
 import net.minecraftforge.common.util.ForgeDirection;
 
-import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
 import com.mrfuzzihead.solarflux.blocks.SolarPanelTileEntity;
 import com.mrfuzzihead.solarflux.config.ModConfiguration;
@@ -14,8 +13,11 @@ import com.mrfuzzihead.solarflux.init.ModItems;
 
 public class TraversalEnergyDispenserModule extends SimpleEnergyDispenserModule {
 
+    /** A sweep is bounded, so a pathological target count cannot stall a tick. */
+    private static final int MAX_NODES_PER_REFRESH = 512;
+
     private final Set<BlockPosition> mVisitedBlocks = Sets.newHashSet();
-    private final LinkedList<BlockPosition> mBlocksToVisit = Lists.newLinkedList();
+    private final Set<BlockPosition> mBlocksToVisit = Sets.newLinkedHashSet();
     private int mDirectNeighborDiscovered;
 
     public TraversalEnergyDispenserModule(SolarPanelTileEntity pTileEntity) {
@@ -27,18 +29,27 @@ public class TraversalEnergyDispenserModule extends SimpleEnergyDispenserModule 
             // We have our new targets.
             getTargets().clear();
             getTargets().addAll(mVisitedBlocks);
+            clearTargetCache();
             // Reset the search.
             mVisitedBlocks.clear();
             discoverNeighbors(new BlockPosition(getTileEntity().x(), getTileEntity().y(), getTileEntity().z()));
             mDirectNeighborDiscovered = mBlocksToVisit.size();
         }
 
-        // If we reached the max number of target we stop the search.
-        if (mVisitedBlocks.size() >= mDirectNeighborDiscovered + getMaximumExtraTargets()) {
-            mBlocksToVisit.clear();
+        // Complete the sweep in one refresh instead of one node per UpdateRate (up to 80 s for a full upgrade),
+        // bounded so a pathological configuration cannot stall the server tick.
+        int processed = 0;
+        while (!searchFinished() && processed < MAX_NODES_PER_REFRESH) {
+            // If we reached the max number of targets we stop the search.
+            if (mVisitedBlocks.size() >= mDirectNeighborDiscovered + getMaximumExtraTargets()) {
+                mBlocksToVisit.clear();
+                break;
+            }
+            BlockPosition position = pollNext();
+            mVisitedBlocks.add(position);
+            discoverNeighbors(position);
+            ++processed;
         }
-
-        progressSearch();
     }
 
     @Override
@@ -46,13 +57,11 @@ public class TraversalEnergyDispenserModule extends SimpleEnergyDispenserModule 
         return ModConfiguration.getTraversalUpgradeUpdateRate();
     }
 
-    private void progressSearch() {
-        if (!searchFinished()) {
-            // TODO use pop for DFS
-            BlockPosition position = mBlocksToVisit.remove();
-            mVisitedBlocks.add(position);
-            discoverNeighbors(position);
-        }
+    private BlockPosition pollNext() {
+        Iterator<BlockPosition> iterator = mBlocksToVisit.iterator();
+        BlockPosition next = iterator.next();
+        iterator.remove();
+        return next;
     }
 
     private boolean searchFinished() {
@@ -65,9 +74,8 @@ public class TraversalEnergyDispenserModule extends SimpleEnergyDispenserModule 
     private void discoverNeighbors(BlockPosition pPosition) {
         for (ForgeDirection direction : ForgeDirection.VALID_DIRECTIONS) {
             BlockPosition neighbor = pPosition.move(direction);
-            // A block reachable from two parents (a diamond) used to be queued twice: it was only tested against the
-            // visited set, which is filled when a block is popped. The queue has to be checked as well, or the search
-            // runs extra rounds and the target list is published late.
+            // Check the queue as well as the visited set: a block reachable from two parents (a diamond) would
+            // otherwise be validated and queued twice.
             if (!mVisitedBlocks.contains(neighbor) && !mBlocksToVisit.contains(neighbor) && isValidTarget(neighbor)) {
                 mBlocksToVisit.add(neighbor);
             }

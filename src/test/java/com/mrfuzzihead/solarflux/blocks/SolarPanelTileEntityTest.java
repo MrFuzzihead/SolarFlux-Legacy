@@ -275,6 +275,87 @@ public class SolarPanelTileEntityTest {
     }
 
     @Test
+    public void theUpgradeCacheIsOnlyRebuiltWhenTheInventoryChanges() {
+        SolarPanelTileEntity panel = newPanel(0);
+
+        setSlot(panel, 0, new ItemStack(ModItems.mUpgradeEfficiency, 1));
+        int rebuilds = panel.getUpgradeCacheRebuilds();
+
+        panel.markDirty();
+        panel.markDirty();
+
+        assertEquals("an unrelated markDirty must not rebuild the cache", rebuilds, panel.getUpgradeCacheRebuilds());
+
+        setSlot(panel, 0, new ItemStack(ModItems.mUpgradeEfficiency, 2));
+        assertTrue(panel.getUpgradeCacheRebuilds() > rebuilds);
+        assertEquals(2, panel.getUpgradeCount(ModItems.mUpgradeEfficiency));
+    }
+
+    @Test
+    public void anInPlaceStackSizeChangeStillRefreshesTheCache() {
+        SolarPanelTileEntity panel = newPanel(0);
+        ItemStack upgrade = new ItemStack(ModItems.mUpgradeCapacity, 1);
+        panel.setInventorySlotContents(0, upgrade);
+        int oneUpgrade = panel.getMaxEnergyStored();
+
+        // mergeItemStack grows the existing stack in place instead of replacing it.
+        upgrade.stackSize = 2;
+        panel.markDirty();
+
+        assertTrue(panel.getMaxEnergyStored() > oneUpgrade);
+    }
+
+    @Test
+    public void aConfigurationVersionChangeRefreshesTheCacheEvenWithUnchangedSlots() {
+        SolarPanelTileEntity panel = newPanel(0);
+        setSlot(panel, 0, new ItemStack(ModItems.mUpgradeCapacity, 1));
+        int rebuilds = panel.getUpgradeCacheRebuilds();
+
+        TestFixture
+            .setStatic(ModConfiguration.class, "sConfigurationVersion", ModConfiguration.getConfigurationVersion() + 1);
+        panel.markDirty();
+
+        assertEquals(rebuilds + 1, panel.getUpgradeCacheRebuilds());
+    }
+
+    @Test
+    public void theDescriptionPacketCarriesOnlyTheDisplayState() {
+        SolarPanelTileEntity panel = newPanel(2);
+        panel.setEnergyStored(1234);
+        setSlot(panel, 0, new ItemStack(ModItems.mUpgradeCapacity, 2));
+        int capacity = panel.getMaxEnergyStored();
+
+        NBTTagCompound tag = panel.getSyncTag();
+
+        assertEquals(1234, tag.getInteger(NBTConstants.ENERGY));
+        assertEquals(2, tag.getInteger(NBTConstants.TIER_INDEX));
+        assertEquals(capacity, tag.getInteger(NBTConstants.SYNC_CAPACITY));
+        assertFalse("the upgrade slots must not be on the wire", tag.hasKey(NBTConstants.ITEMS));
+    }
+
+    @Test
+    public void applyingTheDescriptionPacketLeavesTheClientInventoryAlone() {
+        SolarPanelTileEntity server = newPanel(2);
+        server.setEnergyStored(500);
+        server.setCurrentEnergyGeneration(7);
+        server.setSunIntensity(0.5F);
+        setSlot(server, 0, new ItemStack(ModItems.mUpgradeCapacity, 2));
+        int capacity = server.getMaxEnergyStored();
+
+        SolarPanelTileEntity client = newPanel(0);
+        client.setInventorySlotContents(0, new ItemStack(ModItems.mUpgradeEfficiency, 3));
+
+        client.applySyncTag(server.getSyncTag());
+
+        assertEquals(500, client.getEnergyStored());
+        assertEquals(capacity, client.getMaxEnergyStored());
+        assertSame(ModConfiguration.getTierConfiguration(2), client.getTierConfiguration());
+        assertEquals(7, client.getCurrentEnergyGeneration());
+        assertEquals(0.5F, client.getSunIntensity(), 0.0F);
+        assertEquals(3, client.getUpgradeCount(ModItems.mUpgradeEfficiency));
+    }
+
+    @Test
     public void extractEnergyIsLimitedByTheRequestAndByTheTransferRate() {
         SolarPanelTileEntity panel = newPanel(0);
         panel.setEnergyStored(1000);

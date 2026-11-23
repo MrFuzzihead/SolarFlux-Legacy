@@ -31,7 +31,18 @@ public class SolarPanelBlock extends BaseModBlockWithTileEntity {
         setHardness(3.0F);
         setResistance(5.0F);
         setStepSound(soundTypeMetal);
-        if (!ModConfiguration.isSolarPanelFullBlock()) {
+        applyBlockBounds();
+    }
+
+    /**
+     * Applies the panel geometry from the configuration. Called from the constructor and again when the configuration
+     * is reloaded at runtime.
+     */
+    public void applyBlockBounds() {
+        if (ModConfiguration.isSolarPanelFullBlock()) {
+            setBlockBounds(0.0F, 0.0F, 0.0F, 1.0F, 1.0F, 1.0F);
+            useNeighborBrightness = false;
+        } else {
             setBlockBounds(0.0F, 0.0F, 0.0F, 1.0F, ModConfiguration.getSolarPanelHeight(), 1.0F);
             setLightOpacity(255);
             useNeighborBrightness = true;

@@ -1,6 +1,7 @@
 package com.mrfuzzihead.solarflux.config;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 import java.util.List;
@@ -17,6 +18,15 @@ public class TierConfigurationTest {
 
         assertEquals(10, configuration.getMaximumEnergyGeneration());
         assertEquals(20, configuration.getMaximumEnergyTransfer());
+        assertEquals(30, configuration.getCapacity());
+        assertTrue(configuration.isActive());
+    }
+
+    @Test
+    public void theActiveFlagIsKept() {
+        TierConfiguration configuration = new TierConfiguration(10, 20, 30, false);
+
+        assertFalse(configuration.isActive());
         assertEquals(30, configuration.getCapacity());
     }
 

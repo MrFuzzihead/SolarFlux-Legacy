@@ -44,6 +44,12 @@ public class ModBlocks {
             TopIconHandler iconHandler = new TopIconHandler(topHandler, sideHandler);
 
             SolarPanelBlock block = new SolarPanelBlock("solar" + tierIndex, iconHandler, tierIndex);
+            if (!ModConfiguration.getTierConfiguration(tierIndex)
+                .isActive()) {
+                // Inactive tiers keep their block so existing worlds and the tier indexes survive, but they are not
+                // offered in the creative tab; they also get no recipe (see the recipe registrars).
+                block.setCreativeTab(null);
+            }
             GameRegistry.registerBlock(block, SolarPanelItemBlock.class, "solar" + registeredTierName);
             mSolarPanels.add(block);
         }
@@ -51,5 +57,17 @@ public class ModBlocks {
 
     public static List<BaseModBlock> getSolarPanels() {
         return mSolarPanels;
+    }
+
+    /**
+     * Re-applies the block state that is allowed to change at runtime (the panel height). Registration-time settings,
+     * such as the icon handler and connected textures, still need a restart.
+     */
+    public static void refreshBlockConfiguration() {
+        for (BaseModBlock block : mSolarPanels) {
+            if (block instanceof SolarPanelBlock) {
+                ((SolarPanelBlock) block).applyBlockBounds();
+            }
+        }
     }
 }

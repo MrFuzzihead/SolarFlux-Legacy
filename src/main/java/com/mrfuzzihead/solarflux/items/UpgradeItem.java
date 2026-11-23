@@ -6,8 +6,8 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 
 import com.google.common.collect.Lists;
+import com.mrfuzzihead.solarflux.core.utility.ClientUtils;
 import com.mrfuzzihead.solarflux.core.utility.Color;
-import com.mrfuzzihead.solarflux.core.utility.Utils;
 import com.mrfuzzihead.solarflux.utility.Lang;
 
 public class UpgradeItem extends SFItem {
@@ -24,7 +24,7 @@ public class UpgradeItem extends SFItem {
     @Override
     public void addInformation(ItemStack pItemStack, EntityPlayer pEntityPlayer, List pList, boolean pBoolean) {
         super.addInformation(pItemStack, pEntityPlayer, pList, pBoolean);
-        if (Utils.isShiftKeyDown()) {
+        if (ClientUtils.isShiftKeyDown()) {
             pList.add(Color.AQUA + Lang.localise("solar.panel.upgrade") + Color.GREY);
             pList.addAll(mUpgradeInfos);
             pList.add(Lang.localise("maximum") + " " + getMaximumPerSolarPanel());

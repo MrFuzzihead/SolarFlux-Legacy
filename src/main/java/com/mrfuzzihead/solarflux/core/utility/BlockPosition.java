@@ -43,10 +43,6 @@ public final class BlockPosition {
         return mDirection;
     }
 
-    public BlockPosition forward() {
-        return new BlockPosition(mX + mDirection.offsetX, mY + mDirection.offsetY, mZ + mDirection.offsetZ, mDirection);
-    }
-
     public BlockPosition move(ForgeDirection pDirection) {
         return new BlockPosition(mX + pDirection.offsetX, mY + pDirection.offsetY, mZ + pDirection.offsetZ, pDirection);
     }

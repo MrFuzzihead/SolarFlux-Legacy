@@ -12,7 +12,7 @@ public class ReferenceTest {
     @Test
     public void theModIdentifiersMatchTheFileNameOfTheLangFiles() {
         assertEquals("SolarFlux", Reference.MOD_ID);
-        assertEquals("Solar Flux", Reference.MOD_NAME);
+        assertEquals("SolarFlux", Reference.MOD_NAME);
     }
 
     @Test

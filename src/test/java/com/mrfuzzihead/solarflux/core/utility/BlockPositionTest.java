@@ -22,18 +22,6 @@ public class BlockPositionTest {
     }
 
     @Test
-    public void forwardUsesTheDirectionThePositionWasBuiltWith() {
-        BlockPosition position = new BlockPosition(0, 64, 0, ForgeDirection.NORTH);
-
-        BlockPosition forward = position.forward();
-
-        assertEquals(0, forward.x());
-        assertEquals(64, forward.y());
-        assertEquals(-1, forward.z());
-        assertEquals(ForgeDirection.NORTH, forward.getDirection());
-    }
-
-    @Test
     public void moveUsesTheGivenDirectionAndIgnoresTheStoredOne() {
         BlockPosition position = new BlockPosition(5, 5, 5, ForgeDirection.NORTH);
 

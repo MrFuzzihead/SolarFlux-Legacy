@@ -1,6 +1,6 @@
 package com.mrfuzzihead.solarflux.core.block.icon;
 
-import static com.google.common.base.Preconditions.checkNotNull;
+import static java.util.Objects.requireNonNull;
 
 import net.minecraft.client.renderer.texture.IIconRegister;
 import net.minecraft.util.IIcon;
@@ -16,8 +16,8 @@ public class TopIconHandler implements IBlockIconHandler {
     private final IBlockIconHandler mSides;
 
     public TopIconHandler(IBlockIconHandler pTop, IBlockIconHandler pSides) {
-        mTop = checkNotNull(pTop);
-        mSides = checkNotNull(pSides);
+        mTop = requireNonNull(pTop);
+        mSides = requireNonNull(pSides);
     }
 
     @Override

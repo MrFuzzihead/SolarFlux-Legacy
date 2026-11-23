@@ -1,20 +1,30 @@
 package com.mrfuzzihead.solarflux.gametest;
 
 import net.minecraft.block.Block;
+import net.minecraft.init.Items;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.crafting.CraftingManager;
 import net.minecraft.item.crafting.IRecipe;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.network.play.server.S35PacketUpdateTileEntity;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
+import net.minecraft.world.WorldServer;
+import net.minecraftforge.common.config.Configuration;
+import net.minecraftforge.common.util.FakePlayer;
+import net.minecraftforge.common.util.FakePlayerFactory;
 import net.minecraftforge.common.util.ForgeDirection;
 
 import com.mrfuzzihead.solarflux.blocks.SolarPanelBlock;
 import com.mrfuzzihead.solarflux.blocks.SolarPanelTileEntity;
+import com.mrfuzzihead.solarflux.config.ForgeConfigSource;
 import com.mrfuzzihead.solarflux.config.ModConfiguration;
+import com.mrfuzzihead.solarflux.config.TierConfiguration;
+import com.mrfuzzihead.solarflux.core.utility.Utils;
 import com.mrfuzzihead.solarflux.init.ModBlocks;
 import com.mrfuzzihead.solarflux.init.ModItems;
+import com.mrfuzzihead.solarflux.init.recipes.VanillaRecipeRegistrar;
 import com.mrfuzzihead.solarflux.reference.NBTConstants;
 import com.mrfuzzihead.solarflux.reference.Reference;
 
@@ -77,6 +87,10 @@ final class SolarFluxGameTests {
         checksPlacedPanel(pWorld);
         checksEnergyTransfer(pWorld);
         checksNbtRoundTrip(pWorld);
+        checksRuntimeReload(pWorld);
+        checksWrench(pWorld);
+        checksInactiveTierHandling();
+        checksTileEntityId(pWorld);
     }
 
     /**
@@ -237,7 +251,13 @@ final class SolarFluxGameTests {
             .size(); ++tier) {
             Block panel = ModBlocks.getSolarPanels()
                 .get(tier);
-            check(hasRecipeFor(panel), "tier " + (tier + 1) + " must have a crafting recipe");
+            boolean active = ModConfiguration.getTierConfiguration(tier)
+                .isActive();
+            if (active) {
+                check(hasRecipeFor(panel), "tier " + (tier + 1) + " must have a crafting recipe");
+            } else {
+                check(!hasRecipeFor(panel), "inactive tier " + (tier + 1) + " must not have a crafting recipe");
+            }
         }
         check(hasRecipeForItem(ModItems.mSolarCell1), "the first photovoltaic cell must have a crafting recipe");
         check(hasRecipeForItem(ModItems.mMirror), "the mirror must have a crafting recipe");
@@ -424,6 +444,18 @@ final class SolarFluxGameTests {
 
         check(tag.hasKey(NBTConstants.TIER_INDEX), "the tier index must be written to NBT");
         checkEquals(12345, tag.getInteger(NBTConstants.ENERGY), "the charge must be written to NBT");
+
+        NBTTagCompound sync = original.getSyncTag();
+        check(
+            original.getDescriptionPacket() instanceof S35PacketUpdateTileEntity,
+            "the synced tile entity must send an S35 description packet");
+        check(!sync.hasKey(NBTConstants.ITEMS), "the description packet must not ship the upgrade inventory");
+        checkEquals(
+            original.getMaxEnergyStored(),
+            sync.getInteger(NBTConstants.SYNC_CAPACITY),
+            "the description packet must carry the capacity");
+        checkEquals(2, sync.getInteger(NBTConstants.TIER_INDEX), "the description packet must carry the tier");
+        check(!sync.hasKey(NBTConstants.FURNACE_ENERGY_BUFFER), "the description packet must not carry disk-only data");
         checkEquals(
             ModConfiguration.getTierConfiguration(2)
                 .getMaximumEnergyGeneration(),
@@ -460,6 +492,223 @@ final class SolarFluxGameTests {
                 2,
                 restored.getTotalUpgradeInstalled(),
                 "the total upgrade count must survive an NBT round trip");
+        }
+
+        pWorld.setBlockToAir(x, TEST_HEIGHT, z);
+    }
+
+    // -------------------------------------------------------------------------------------------------------
+    // Runtime configuration reload
+    // -------------------------------------------------------------------------------------------------------
+
+    /**
+     * A config GUI change fires a reload on a live server. Restart-safe values must be re-applied, and the tier list
+     * must not be rebuilt: the blocks are already registered, so reinterpreting every saved tier index would corrupt
+     * existing panels.
+     */
+    private static void checksRuntimeReload(World pWorld) {
+        Configuration config = ModConfiguration.getConfiguration();
+        check(config != null, "a live Forge configuration must exist");
+        if (config == null) {
+            return;
+        }
+
+        float originalHeight = ModConfiguration.getSolarPanelHeight();
+        java.util.List<TierConfiguration> tiersBefore = ModConfiguration.getTierConfigurations();
+        try {
+            config.get(Configuration.CATEGORY_GENERAL, "SolarPanelHeight", originalHeight)
+                .set((double) 0.5F);
+            ModConfiguration.reload();
+
+            checkEquals(0.5F, ModConfiguration.getSolarPanelHeight(), "a reload applies the restart-safe height");
+            check(ModConfiguration.getTierConfigurations() == tiersBefore, "a reload must not rebuild the tier list");
+
+            Block panel = GameRegistry.findBlock(Reference.MOD_ID, "solar1");
+            check(panel != null, "the first tier block must exist for the bounds check");
+            if (panel != null) {
+                checkEquals(
+                    0.5D,
+                    panel.getCollisionBoundingBoxFromPool(pWorld, 0, 0, 0).maxY,
+                    "a reload must re-apply the panel bounds");
+            }
+        } finally {
+            config.get(Configuration.CATEGORY_GENERAL, "SolarPanelHeight", originalHeight)
+                .set((double) originalHeight);
+            ModConfiguration.reload();
+        }
+
+        checkEquals(
+            originalHeight,
+            ModConfiguration.getSolarPanelHeight(),
+            "the reload test must restore the panel height");
+    }
+
+    // -------------------------------------------------------------------------------------------------------
+    // Wrench support
+    // -------------------------------------------------------------------------------------------------------
+
+    /**
+     * A CoFH hammer (the Thermal Expansion tool) must be able to dismantle a panel, and a plain item must not.
+     */
+    private static void checksWrench(World pWorld) {
+        Block block = GameRegistry.findBlock(Reference.MOD_ID, "solar1");
+        Item hammer = GameTestMod.getTestHammerItem();
+        check(block != null, "the first tier block must exist for the wrench check");
+        check(hammer != null, "the test hammer item must be registered");
+        if (block == null || hammer == null) {
+            return;
+        }
+
+        int x = 10;
+        int z = 10;
+        pWorld.setBlock(x, TEST_HEIGHT, z, block);
+        check(
+            pWorld.getTileEntity(x, TEST_HEIGHT, z) instanceof SolarPanelTileEntity,
+            "the panel must be placed for the wrench check");
+
+        FakePlayer player = FakePlayerFactory.getMinecraft((WorldServer) pWorld);
+        try {
+            player.inventory.mainInventory[0] = new ItemStack(hammer);
+            player.inventory.currentItem = 0;
+            player.setSneaking(true);
+
+            check(Utils.hasUsableWrench(player, x, TEST_HEIGHT, z), "a CoFH hammer must count as a wrench");
+            check(
+                block.onBlockActivated(pWorld, x, TEST_HEIGHT, z, player, 1, 0.5F, 0.5F, 0.5F),
+                "the wrench click must be handled");
+            check(pWorld.isAirBlock(x, TEST_HEIGHT, z), "a CoFH hammer must dismantle the panel");
+
+            pWorld.setBlock(x, TEST_HEIGHT, z, block);
+            player.inventory.mainInventory[0] = new ItemStack(Items.apple);
+            check(!Utils.hasUsableWrench(player, x, TEST_HEIGHT, z), "a plain item must not count as a wrench");
+            block.onBlockActivated(pWorld, x, TEST_HEIGHT, z, player, 1, 0.5F, 0.5F, 0.5F);
+            check(!pWorld.isAirBlock(x, TEST_HEIGHT, z), "a plain item must not dismantle the panel");
+        } finally {
+            player.inventory.mainInventory[0] = null;
+            player.setSneaking(false);
+            pWorld.setBlockToAir(x, TEST_HEIGHT, z);
+        }
+    }
+
+    // -------------------------------------------------------------------------------------------------------
+    // Tier activation (C1) and the tile entity id (R5)
+    // -------------------------------------------------------------------------------------------------------
+
+    /**
+     * C1: a gap in the Active flags must not truncate the list. The crafted Configuration has tier 1 inactive and
+     * tiers 0, 2..5 active; parsing must keep all six (index stability) and the recipe registrar must skip tier 1.
+     */
+    private static void checksInactiveTierHandling() {
+        java.io.File file = null;
+        try {
+            file = java.io.File.createTempFile("solarflux-tier-test", ".cfg");
+            Configuration config = new Configuration(file);
+            for (int tier = 0; tier < 6; ++tier) {
+                String category = "solar_panel_tier" + tier;
+                config.getBoolean("Active", category, tier != 1, "test");
+                config.getInt("MaximumEnergyGeneration", category, 10 + tier, 1, 1_000_000, "test");
+                config.getInt("MaximumEnergyTransfer", category, 20 + tier, 1, 1_000_000, "test");
+                config.getInt("Capacity", category, 1_000 + tier, 1, 1_000_000, "test");
+            }
+            config.save();
+
+            Configuration reloaded = new Configuration(file);
+            java.util.List<TierConfiguration> parsed = ModConfiguration
+                .parseTierConfigurations(new ForgeConfigSource(reloaded));
+
+            checkEquals(6, parsed.size(), "a gap in the Active flags must not truncate the tier list");
+            check(
+                parsed.get(0)
+                    .isActive(),
+                "tier 1 must stay active");
+            check(
+                !parsed.get(1)
+                    .isActive(),
+                "tier 2 must be parsed as inactive");
+            check(
+                parsed.get(2)
+                    .isActive(),
+                "tier 3 must stay active");
+            checkEquals(
+                12,
+                parsed.get(2)
+                    .getMaximumEnergyGeneration(),
+                "tier 3 keeps its generation");
+            checkEquals(
+                1_002,
+                parsed.get(2)
+                    .getCapacity(),
+                "tier 3 keeps its capacity");
+
+            // Register recipes against the parsed list: the inactive tier gets no recipe, the tiers around it do.
+            java.lang.reflect.Field tiers = ModConfiguration.class.getDeclaredField("mTierConfigurations");
+            tiers.setAccessible(true);
+            Object live = tiers.get(null);
+            try {
+                tiers.set(null, parsed);
+                CraftingManager.getInstance()
+                    .getRecipeList()
+                    .clear();
+                new VanillaRecipeRegistrar().registerRecipes();
+
+                check(
+                    !hasRecipeFor(
+                        ModBlocks.getSolarPanels()
+                            .get(1)),
+                    "an inactive tier must not get a recipe");
+                check(
+                    hasRecipeFor(
+                        ModBlocks.getSolarPanels()
+                            .get(0)),
+                    "an active tier must still get a recipe");
+                check(
+                    hasRecipeFor(
+                        ModBlocks.getSolarPanels()
+                            .get(2)),
+                    "a tier above the gap must still get a recipe");
+            } finally {
+                tiers.set(null, live);
+            }
+        } catch (Throwable t) {
+            check(false, "the tier activation test threw: " + t);
+            t.printStackTrace();
+        } finally {
+            if (file != null) {
+                file.delete();
+            }
+        }
+    }
+
+    /** R5: new saves write the namespaced id, old saves with the legacy id still load. */
+    private static void checksTileEntityId(World pWorld) {
+        int x = -10;
+        int z = 10;
+        Block block = GameRegistry.findBlock(Reference.MOD_ID, "solar1");
+        check(block != null, "the first tier block must exist for the tile-entity id test");
+        if (block == null) {
+            return;
+        }
+
+        pWorld.setBlock(x, TEST_HEIGHT, z, block);
+        TileEntity tileEntity = pWorld.getTileEntity(x, TEST_HEIGHT, z);
+        if (!(tileEntity instanceof SolarPanelTileEntity)) {
+            check(false, "the tile-entity id test needs a SolarPanelTileEntity");
+            pWorld.setBlockToAir(x, TEST_HEIGHT, z);
+            return;
+        }
+
+        SolarPanelTileEntity panel = (SolarPanelTileEntity) tileEntity;
+        panel.setEnergyStored(4242);
+        NBTTagCompound tag = new NBTTagCompound();
+        panel.writeToNBT(tag);
+
+        checkEquals("solarflux:solar", tag.getString("id"), "new saves must use the namespaced tile-entity id");
+
+        tag.setString("id", "solar");
+        TileEntity legacy = TileEntity.createAndLoadEntity(tag);
+        check(legacy instanceof SolarPanelTileEntity, "the legacy \"solar\" id must still resolve");
+        if (legacy instanceof SolarPanelTileEntity) {
+            checkEquals(4242, ((SolarPanelTileEntity) legacy).getEnergyStored(), "a legacy panel keeps its charge");
         }
 
         pWorld.setBlockToAir(x, TEST_HEIGHT, z);

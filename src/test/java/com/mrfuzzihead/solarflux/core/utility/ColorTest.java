@@ -10,8 +10,6 @@ public class ColorTest {
 
     @Test
     public void everyColorCarriesTheMinecraftFormattingCode() {
-        assertEquals("\u00a70", Color.BLACK.toString());
-        assertEquals("\u00a7f", Color.WHITE.toString());
         assertEquals("\u00a77", Color.GREY.toString());
         assertEquals("\u00a7b", Color.AQUA.toString());
         assertEquals("\u00a7a", Color.GREEN.toString());

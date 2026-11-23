@@ -4,6 +4,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import net.minecraft.tileentity.TileEntityFurnace;
@@ -150,6 +152,38 @@ public class SimpleEnergyDispenserModuleTest {
     }
 
     @Test
+    public void aSmallBufferIsSplitEvenlyAcrossTheTargets() {
+        TestEnergyReceiverTileEntity north = new TestEnergyReceiverTileEntity();
+        TestEnergyReceiverTileEntity south = new TestEnergyReceiverTileEntity();
+        putTileEntity(ForgeDirection.NORTH, north);
+        putTileEntity(ForgeDirection.SOUTH, south);
+        module.searchTargets();
+        panel.setEnergyStored(10);
+
+        module.sendEnergyToTargets();
+
+        assertEquals(5, north.getReceived());
+        assertEquals(5, south.getReceived());
+        assertEquals(0, panel.getEnergyStored());
+    }
+
+    @Test
+    public void aFullBufferStillSendsTheTransferRateToEveryTarget() {
+        TestEnergyReceiverTileEntity north = new TestEnergyReceiverTileEntity();
+        TestEnergyReceiverTileEntity south = new TestEnergyReceiverTileEntity();
+        putTileEntity(ForgeDirection.NORTH, north);
+        putTileEntity(ForgeDirection.SOUTH, south);
+        module.searchTargets();
+        panel.setEnergyStored(1000);
+
+        module.sendEnergyToTargets();
+
+        assertEquals(16, north.getReceived());
+        assertEquals(16, south.getReceived());
+        assertEquals(968, panel.getEnergyStored());
+    }
+
+    @Test
     public void theRoundRobinIndexAdvancesOverTheTargets() {
         TestEnergyReceiverTileEntity first = new TestEnergyReceiverTileEntity(1);
         TestEnergyReceiverTileEntity second = new TestEnergyReceiverTileEntity(1);
@@ -164,6 +198,41 @@ public class SimpleEnergyDispenserModuleTest {
         assertEquals(1, first.getReceiveCalls());
         assertEquals(1, second.getReceiveCalls());
         assertEquals(998, panel.getEnergyStored());
+    }
+
+    @Test
+    public void aTargetTileEntityIsResolvedOncePerRefresh() {
+        TestEnergyReceiverTileEntity receiver = new TestEnergyReceiverTileEntity();
+        putTileEntity(ForgeDirection.NORTH, receiver);
+        module.searchTargets();
+        panel.setEnergyStored(1000);
+
+        module.sendEnergyToTargets();
+        module.sendEnergyToTargets();
+        module.sendEnergyToTargets();
+
+        // One lookup while validating the target, one while resolving it for the first send.
+        verify(world, times(2)).getTileEntity(X, Y, Z - 1);
+        assertEquals(1000 - 3 * 16, panel.getEnergyStored());
+        assertEquals(3 * 16, receiver.getReceived());
+    }
+
+    @Test
+    public void aReplacedTargetIsPickedUpAfterTheNextRefresh() {
+        TestEnergyReceiverTileEntity first = new TestEnergyReceiverTileEntity();
+        TestEnergyReceiverTileEntity second = new TestEnergyReceiverTileEntity();
+        putTileEntity(ForgeDirection.NORTH, first);
+        module.searchTargets();
+        panel.setEnergyStored(1000);
+        module.sendEnergyToTargets();
+        assertEquals(16, first.getReceived());
+
+        putTileEntity(ForgeDirection.NORTH, second);
+        module.searchTargets();
+        module.sendEnergyToTargets();
+
+        assertEquals(16, first.getReceived());
+        assertEquals(16, second.getReceived());
     }
 
     @Test

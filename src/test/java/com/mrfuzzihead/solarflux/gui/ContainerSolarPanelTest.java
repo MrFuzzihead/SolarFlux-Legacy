@@ -145,6 +145,26 @@ public class ContainerSolarPanelTest {
     }
 
     @Test
+    public void mergeItemStackHonoursTheItemMaxStackSize() {
+        // A tool-like upgrade: legal in the panel, but only one per slot.
+        UpgradeItem singleStack = new UpgradeItem("upgradeSingle", 8, new java.util.ArrayList<String>()) {
+
+            @Override
+            public int getItemStackLimit() {
+                return 1;
+            }
+        };
+        mPlayerInventory.mainInventory[9] = new ItemStack(singleStack, 5);
+
+        assertNotNull(mContainer.transferStackInSlot(null, FIRST_PLAYER_SLOT));
+
+        assertEquals(1, mPanel.getStackInSlot(0).stackSize);
+        assertEquals(1, mPanel.getStackInSlot(1).stackSize);
+        assertNotNull(mPlayerInventory.mainInventory[9]);
+        assertEquals(3, mPlayerInventory.mainInventory[9].stackSize);
+    }
+
+    @Test
     public void upgradeSlotsCannotBeDragFilled() {
         for (int slot = 0; slot < SolarPanelTileEntity.INVENTORY_SIZE; ++slot) {
             assertFalse("slot " + slot, mContainer.canDragIntoSlot(mContainer.getSlot(slot)));

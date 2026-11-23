@@ -3,6 +3,9 @@ package com.mrfuzzihead.solarflux.gametest;
 import net.minecraft.block.Block;
 import net.minecraft.block.ITileEntityProvider;
 import net.minecraft.block.material.Material;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
@@ -10,11 +13,16 @@ import net.minecraft.world.WorldServer;
 import net.minecraftforge.common.util.ForgeDirection;
 
 import cofh.api.energy.IEnergyReceiver;
+import cofh.api.item.IToolHammer;
 import cpw.mods.fml.common.FMLCommonHandler;
 import cpw.mods.fml.common.Mod;
 import cpw.mods.fml.common.event.FMLPreInitializationEvent;
 import cpw.mods.fml.common.event.FMLServerStartedEvent;
+import cpw.mods.fml.common.eventhandler.SubscribeEvent;
+import cpw.mods.fml.common.gameevent.TickEvent;
 import cpw.mods.fml.common.registry.GameRegistry;
+import cpw.mods.fml.relauncher.Side;
+import cpw.mods.fml.relauncher.SideOnly;
 
 /**
  * Test-only mod: a separate, non-shipped {@code @Mod} that asserts Solar Flux works against the real game.
@@ -47,8 +55,10 @@ public class GameTestMod {
     static final String FAIL_MARKER = "SOLARFLUX_GAMETEST_FAILED";
 
     private static final String RECEIVER_BLOCK_NAME = "solarflux_test_receiver";
+    private static final String HAMMER_ITEM_NAME = "solarflux_test_hammer";
 
     private static Block sTestReceiverBlock;
+    private static Item sTestHammerItem;
 
     private boolean ran;
 
@@ -56,11 +66,34 @@ public class GameTestMod {
         return sTestReceiverBlock;
     }
 
+    static Item getTestHammerItem() {
+        return sTestHammerItem;
+    }
+
     @Mod.EventHandler
     public void preInit(FMLPreInitializationEvent event) {
         sTestReceiverBlock = new TestReceiverBlock();
         GameRegistry.registerBlock(sTestReceiverBlock, RECEIVER_BLOCK_NAME);
         GameRegistry.registerTileEntity(TestEnergyReceiver.class, RECEIVER_BLOCK_NAME + "_tile");
+
+        sTestHammerItem = new TestHammerItem();
+        GameRegistry.registerItem(sTestHammerItem, HAMMER_ITEM_NAME);
+
+        // The client tick hook lives on this instance; without it the client half never runs.
+        FMLCommonHandler.instance()
+            .bus()
+            .register(this);
+    }
+
+    /**
+     * Client half of the harness: runs once at the main menu and exits the client with the result.
+     */
+    @SideOnly(Side.CLIENT)
+    @SubscribeEvent
+    public void onClientTick(TickEvent.ClientTickEvent pEvent) {
+        if (pEvent.phase == TickEvent.Phase.END && Boolean.getBoolean("solarflux.gameTest")) {
+            ClientGameTests.onClientTick();
+        }
     }
 
     @Mod.EventHandler
@@ -170,6 +203,24 @@ public class GameTestMod {
         @Override
         public boolean canConnectEnergy(ForgeDirection pFrom) {
             return true;
+        }
+    }
+
+    /** A CoFH-style hammer, so the wrench path can be exercised without a second mod installed. */
+    public static class TestHammerItem extends Item implements IToolHammer {
+
+        TestHammerItem() {
+            setUnlocalizedName("solarflux_test_hammer");
+        }
+
+        @Override
+        public boolean isUsable(ItemStack pStack, EntityLivingBase pUser, int pX, int pY, int pZ) {
+            return true;
+        }
+
+        @Override
+        public void toolUsed(ItemStack pStack, EntityLivingBase pUser, int pX, int pY, int pZ) {
+            // Nothing to do: the game test only checks the usability decision.
         }
     }
 }

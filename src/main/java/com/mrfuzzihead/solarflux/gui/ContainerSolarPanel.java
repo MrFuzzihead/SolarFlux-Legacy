@@ -15,6 +15,10 @@ import cpw.mods.fml.relauncher.SideOnly;
 
 public class ContainerSolarPanel extends BaseModContainer {
 
+    /**
+     * Slot indices in this class are <b>container</b> slots. {@code Slot.getSlotIndex()} is an index inside the
+     * slot's inventory (player hotbar slots report 0..8, colliding with the upgrade range), so never compare the two.
+     */
     private final SolarPanelTileEntity mSolarPanelTileEntity;
 
     public ContainerSolarPanel(InventoryPlayer pInventoryPlayer, SolarPanelTileEntity pSolarPanelTileEntity) {
@@ -71,9 +75,14 @@ public class ContainerSolarPanel extends BaseModContainer {
         return pSlot.inventory != mSolarPanelTileEntity;
     }
 
+    /** True for the five upgrade slots; they are the first container slots. */
+    private static boolean isUpgradeSlot(int pContainerSlot) {
+        return pContainerSlot >= 0 && pContainerSlot < SolarPanelTileEntity.INVENTORY_SIZE;
+    }
+
     @Override
-    public ItemStack transferStackInSlot(EntityPlayer pPlayer, int pSlotIndex) {
-        Slot slot = getSlot(pSlotIndex);
+    public ItemStack transferStackInSlot(EntityPlayer pPlayer, int pContainerSlot) {
+        Slot slot = getSlot(pContainerSlot);
         if (slot == null || !slot.getHasStack()) {
             return null;
         }
@@ -82,7 +91,7 @@ public class ContainerSolarPanel extends BaseModContainer {
         ItemStack transferred = slotItemStack.copy();
         boolean moved = false;
 
-        if (pSlotIndex < SolarPanelTileEntity.INVENTORY_SIZE) {
+        if (isUpgradeSlot(pContainerSlot)) {
             // From container to player's inventory.
             moved = mergeItemStack(slotItemStack, SolarPanelTileEntity.INVENTORY_SIZE, inventorySlots.size(), false);
         } else {
@@ -126,14 +135,13 @@ public class ContainerSolarPanel extends BaseModContainer {
     }
 
     @Override
-    public ItemStack slotClick(int pSlotIndex, int pMouseButton, int pClickMode, EntityPlayer pPlayer) {
+    public ItemStack slotClick(int pContainerSlot, int pMouseButton, int pClickMode, EntityPlayer pPlayer) {
         ItemStack oldItemStack = pPlayer.inventory.getItemStack();
-        if (SolarPanelTileEntity.UPGRADE_SLOTS.contains(pSlotIndex) && oldItemStack != null
-            && oldItemStack.getItem() instanceof UpgradeItem) {
+        if (isUpgradeSlot(pContainerSlot) && oldItemStack != null && oldItemStack.getItem() instanceof UpgradeItem) {
             if (pClickMode == CLICK_MODE_NORMAL
                 && (pMouseButton == MOUSE_LEFT_CLICK || pMouseButton == MOUSE_RIGHT_CLICK)) {
-                // TODO add a check for slot -999 (had a crash before line just below)
-                ItemStack currentItemInSlot = mSolarPanelTileEntity.getStackInSlot(pSlotIndex);
+                // Read through the Slot, so this never assumes that container slot N is inventory slot N.
+                ItemStack currentItemInSlot = getSlot(pContainerSlot).getStack();
                 if (currentItemInSlot == null
                     || Utils.itemStacksEqualIgnoreStackSize(oldItemStack, currentItemInSlot)) {
                     int canAdd = mSolarPanelTileEntity.additionalUpgradeAllowed(oldItemStack);
@@ -149,7 +157,7 @@ public class ContainerSolarPanel extends BaseModContainer {
                             newStack = oldItemStack.splitStack(canAdd);
                         }
                         pPlayer.inventory.setItemStack(newStack);
-                        ItemStack result = super.slotClick(pSlotIndex, pMouseButton, pClickMode, pPlayer);
+                        ItemStack result = super.slotClick(pContainerSlot, pMouseButton, pClickMode, pPlayer);
                         ItemStack remainder = pPlayer.inventory.getItemStack();
                         if (remainder != null) {
                             // Vanilla could not put everything into the slot (the slot limit stopped it); that
@@ -167,6 +175,6 @@ public class ContainerSolarPanel extends BaseModContainer {
                 }
             }
         }
-        return super.slotClick(pSlotIndex, pMouseButton, pClickMode, pPlayer);
+        return super.slotClick(pContainerSlot, pMouseButton, pClickMode, pPlayer);
     }
 }

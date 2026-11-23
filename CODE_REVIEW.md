@@ -21,12 +21,14 @@ Baseline measurements:
 
 | Metric | Value |
 | --- | --- |
-| Test cases | 234 |
-| Line coverage (JaCoCo, filtered) | 708 / 1338 = **52.9 %** |
-| Branch coverage (filtered) | 238 / 394 = **60.4 %** |
-| Coverage gate | 46 % line / 50 % branch (6.7 / 8.9 points below actual) |
+| Test cases | 264 |
+| Line coverage (JaCoCo, filtered) | 837 / 1438 = **58.2 %** |
+| Branch coverage (filtered) | 286 / 452 = **63.3 %** |
+| Coverage gate | 46 % line / 50 % branch (12.2 / 13.3 points below actual) |
 | Excluded from the gate | `gui/**`, `core/gui/**`, `creativetab/**`, `ModConfigurationGui*`, `ConfigurationGuiFactory`, `Tags` |
-| Game-test coverage (separate report) | 726 / 1303 lines = **55.7 %**, branches 32.4 % |
+| Server game-test checks | **158 / 158** passing (`./gradlew gameTestServer`) |
+| Client game-test checks | **6 / 6** passing (`./gradlew runClient -PgameTest`) |
+| Game-test coverage (separate report, server run) | 880 / 1441 lines = **61.1 %**, branches 39.3 % |
 
 The suite is in good shape for its age: `StatefulEnergyStorage` (100 %), `BaseInventory` (97 %),
 `ConnectedIconHandler` (97 %), `core.utility` (93 %) and `items` (79 %) are well covered. The gaps are
@@ -137,12 +139,11 @@ The buffer is still shared by all furnace targets. That part is intentional: it 
 prepayment for the furnace upgrade, and each grant is consumed by whichever furnace needs it first.
 The defect was that the prepayment vanished when the module was replaced or the panel dismantled.
 
-**No fully headless S1–S3 findings remain.** What is left needs something the unit suite deliberately
-does not have: C1 needs the `ConfigSource` seam from §6.2 *and* a policy decision (a non-contiguous
-`Active=false` cannot be honoured without either renumbering existing panels or keeping placeholder
-blocks); C3 needs the same seam and asserts block registration; G1 needs a booted client; R1 needs the
-`WrenchHelper` extraction plus the Forge API registry; M2 is documented behaviour, so only a design
-change remains.
+**Not addressed in that batch:** C1 needs the `ConfigSource` seam from §6.2 *and* a policy decision (a
+non-contiguous `Active=false` cannot be honoured without either renumbering existing panels or keeping
+placeholder blocks); G1 needed a client (closed in batch 7 by the client harness); M2 is documented
+behaviour, so only a design change remains. C3 and R1 were later covered by the server game test
+(batch 6), and I4 by a unit test in batch 7.
 
 **Batch 5 — the S4 findings that a headless unit test can prove.** Eleven tests were confirmed to fail on
 the previous logic.
@@ -156,10 +157,75 @@ the previous logic.
 | R2 | Placement and dismantling check the tile entity type before casting | `SolarPanelBlock` | `placingAPanelWithoutATileEntityDoesNotThrow`, `dismantlingAPanelWithoutATileEntityDropsTheItem` |
 | R3 | `dropInventory` does nothing on the client, so no ghost item entities | `BaseModBlockWithTileEntity` | `theClientDoesNotDropTheInventory` |
 
-**Remaining S4s are not meaningfully testable:** G3 needs a booted client (`GuiConfig`); R4 has no
-observable effect because `Block.onBlockEventReceived` always returns false, so there is no return value
-to propagate; R5 (renaming the tile-entity id) would orphan existing panels in saved worlds and needs a
-migration, not a unit test.
+**Remaining S4s:** see §1.2 for the per-item game-test verdict.
+
+**Batch 6 — findings that needed a real Forge launch, covered by the in-game test mod.** Four new checks
+were confirmed to fail on the previous logic (127/131 before the fix, 131/131 after).
+
+| # | Fix | Files | Tests |
+| --- | --- | --- | --- |
+| C3 | Runtime reload re-applies the restart-safe values and the panel bounds, and deliberately does not rebuild the tier list; the log line tells pack authors that tier/registration changes need a restart | `ModConfiguration.reload`, `ModBlocks.refreshBlockConfiguration`, `SolarPanelBlock.applyBlockBounds` | game test `checksRuntimeReload`: height applied, tier list identity unchanged, block bounds re-applied |
+| R1 | `hasUsableWrench` also accepts a CoFH `IToolHammer` (Thermal Expansion's hammer); the BuildCraft path keeps its API gate | `Utils.hasUsableWrench` | game test `checksWrench`: hammer counts as a wrench and dismantles, a plain item does not; unit `aCoFHHammerCountsAsAWrench`, `aPlainItemIsNotAWrench` |
+
+### 1.2 Game-test verdict for every remaining finding
+
+The harnesses are a dedicated server (`./gradlew gameTestServer`) and a dev client
+(`./gradlew runClient -PgameTest`): real Forge/FML and registries on both, a real world on the server,
+and the real GUI plus language on the client. That decides each item:
+
+| # | Sev | Verdict |
+| --- | --- | --- |
+| C1 | S2 | **Done in batch 8.** Tiers are parsed up to the last *configured* tier instead of stopping at the first inactive; each tier keeps its index and block, and an inactive tier only loses its recipe. |
+| C3 | S3 | **Done in batch 6.** |
+| I4 | S3 | **Done in batch 7** (unit test; no harness needed). |
+| G1 | S2 | **Done in batch 7** (client test). |
+| R1 | S2 | **Closed by decision.** CoFH hammers are supported and game-tested (batch 6); BuildCraft works behind its API gate. IC2 support is out of scope (it would add a new dependency for one interface). |
+| M2 | S3 | **Won't fix (by design).** Keeping the previous target list until a search completes is deliberate; only the cadence is a design choice. |
+| G3 | S4 | **Done in batch 7** (client test). |
+| R4 | S4 | **No action.** `Block.onBlockEventReceived` always returns `false`, so there is no super return value to observe. |
+| R5 | S4 | **Done in batch 8** (legacy alias + canonical `solarflux:solar`). |
+
+**Remaining after these decisions: none.** Every S1–S4 finding is fixed, closed by decision, or has no
+observable effect.
+
+**Batch 7 — the remaining testable items, including a client harness.** New regression coverage: the unit
+test for I4 and two client assertion groups (six checks).
+
+| # | Fix | Files | Tests |
+| --- | --- | --- | --- |
+| I4 | `mergeItemStack`'s empty-slot branch caps at `min(item max stack size, slot limit)`, like vanilla | `BaseModContainer.mergeItemStack` | unit `mergeItemStackHonoursTheItemMaxStackSize` |
+| G1 | The panel GUI title is the panel's localised name; `GuiSolarPanel.getPanelTitle()` is extracted so it can be asserted without rendering | `GuiSolarPanel` | client `checkPanelTitle` (title equals the localised panel name, is not "Inventory", and is actually translated) |
+| G3 | The config GUI passes every category (general, upgrades, one per tier) instead of only general | `ModConfiguration.getConfigGuiElements`, `ModConfigurationGui` | client `checkConfigurationGui` (the `GuiConfig` instance carries the general, upgrades and tier categories) |
+
+**Batch 8 — C1 and R5.** The tier-activation rework and the tile-entity id migration.
+
+| # | Fix | Files | Tests |
+| --- | --- | --- | --- |
+| C1 | Tiers are parsed up to the last *configured* tier (hard cap 16) instead of stopping at the first `Active=false`; `TierConfiguration` carries an `active` flag, the list and the block list stay index-aligned, and an inactive tier keeps its block (and any existing world) while losing only its recipe and its creative-tab entry. Configs that already contain `solar_panel_tier6` gain a seventh inactive, recipe-less, creative-hidden block; indices 0–5 are untouched. | `TierConfiguration`, `ModConfiguration.parseTierConfigurations`, `ModBlocks`, `VanillaRecipeRegistrar` | game `checksInactiveTierHandling` (crafted gap config: six tiers parsed, tier 2 inactive with its own values, no tier-2 recipe, tier 1/3 recipes still registered); unit `theActiveFlagIsKept` |
+| R5 | The tile entity is registered as `solarflux:solar`, with `solar` kept as a legacy alias (one class under two ids; `classToNameMap` is last-wins), so new saves are namespaced while old saves resolve | `SolarFluxMod` | game `checksTileEntityId` (new NBT id, legacy id loads, charge preserved) |
+
+**Modid rename — considered for R5, rejected.** 1.7.10 persists a per-world registry name→id map
+(`GameData.injectWorldIDMap`), and names that are no longer registered are removed unless the mod
+answers `FMLMissingMappingsEvent`. Renaming `SolarFlux` → `solarflux` changes every block and item
+registry name, so it would need ~30 remaps, a config-file move (`SolarFlux.cfg` → `solarflux.cfg`), and
+would still trigger the world's "different mods" warning and break third-party `after:SolarFlux`
+declarations. The tile-entity id is independent of the modid and is namespaced above.
+
+### 1.3 Client test harness
+
+The client half runs on a real dev client at the main menu, where the client-only classes are loaded
+and the language file is active:
+
+```
+./gradlew runClient -PgameTest
+```
+
+`GameTestMod` registers a client tick hook (stripped on the server) that waits for `GuiMainMenu`, runs
+`ClientGameTests`, logs `SOLARFLUX_CLIENTTEST_OK`/`FAILED`, and exits the client with the result. It is
+how the two GUI findings are closed without a human looking at the screen.
+
+Both harnesses write the same `build/jacoco/gameTest.exec`, so generate `jacocoGameTestReport` after the
+run whose coverage you want (the numbers above are from the server run).
 
 Non-issues verified against vanilla (see Appendix B): `setLightOpacity(255)` on a partial block, the
 top face rejecting connections, the `solar0` name vs `solar1` registry name, and the metadata-less
@@ -439,6 +505,24 @@ literal and `hasCustomInventoryName()` returns `false` in `BaseInventory`).
    bother. `mUpgradeCache` as `HashMap<Item, Integer>` is fine, but `int[]` indexed by an enum would
    avoid boxing. Only do this if profiling shows it.
 
+### 2.1 Perf batch P1 (done)
+
+| # | Change | Where | Tests |
+| --- | --- | --- | --- |
+| 1 | The S35 description packet carries only tier, energy, capacity, generation and sun; the inventory stays on disk. `BaseModTileEntitySynced` gained overridable `addSyncDataToNBT`/`loadSyncDataFromNBT` (defaulting to the full data for other TEs) plus `getSyncTag`/`applySyncTag` seams whose names do not differ between the dev and production mappings. | `BaseModTileEntitySynced`, `SolarPanelTileEntity`, `NBTConstants` | unit `theDescriptionPacketCarriesOnlyTheDisplayState`, `applyingTheDescriptionPacketLeavesTheClientInventoryAlone`; game `checksNbtRoundTrip` (no `ITEMS`, capacity/tier present, no disk-only keys, real S35 packet) |
+| 2 | Skip generation on the client | already done with E6 | — |
+| 3 | Targets resolve their tile entity once per refresh, in a map keyed by `BlockPosition` that is dropped whenever the target list is rebuilt | `SimpleEnergyDispenserModule`, `TraversalEnergyDispenserModule` | unit `aTargetTileEntityIsResolvedOncePerRefresh` (2 world lookups over 3 sends instead of 4), `aReplacedTargetIsPickedUpAfterTheNextRefresh`, traversal `aRepublishedTargetListDropsTheResolvedTileEntities` |
+
+**P2 (done)**
+
+| # | Change | Where | Tests |
+| --- | --- | --- | --- |
+| 4 | One `searchTargets` call completes a sweep (node budget 512) instead of one node per update rate; the queue is a `LinkedHashSet` polled in insertion order | `TraversalEnergyDispenserModule` | `oneRefreshCompletesTheWholeSweep`, `aBlockReachableFromTwoParentsIsValidatedOnce` |
+| 5/6 | The upgrade cache remembers the slot references and sizes and skips the rebuild (and its `Math.pow`s) when an unrelated `markDirty` fires; an in-place stack growth still triggers it, and a configuration version bump forces it so a reload is never masked by unchanged slots | `SolarPanelTileEntity`, `ModConfiguration` | `theUpgradeCacheIsOnlyRebuiltWhenTheInventoryChanges`, `anInPlaceStackSizeChangeStillRefreshesTheCache`, `aConfigurationVersionChangeRefreshesTheCacheEvenWithUnchangedSlots` |
+| 7 | Energy is shared across targets (`available / targets`) instead of the first target draining a small buffer; a full panel still sends the full transfer rate to each | `SimpleEnergyDispenserModule`, `StatefulEnergyStorage.sendTo` | `aSmallBufferIsSplitEvenlyAcrossTheTargets`, `aFullBufferStillSendsTheTransferRateToEveryTarget`, `sendToIsCappedByTheGivenAmount`, `sendToIsAlsoCappedByTheTransferRate`, `sendToTreatsANegativeCapAsZero` |
+
+All §2 items are now done except 8/9, which are deliberately skipped (negligible cost / profiling-only).
+
 ---
 
 ## 3. Refactors
@@ -490,25 +574,51 @@ literal and `hasCustomInventoryName()` returns `false` in `BaseInventory`).
     but it is a footgun: one refactor that moves the call into a constructor is a `NoClassDefFoundError`
     on dedicated servers. A `ClientUtils` class (or `SolarPanelItemBlock` directly) is safer.
 
+### 3.1 Refactor/dead-code batch R1 (done)
+
+| # | Change | Tests |
+| --- | --- | --- |
+| 1 | Sun model extracted to `SunIntensity.calculate(...)`; the tile entity only supplies the inputs | `SunIntensityTest` (noon, midnight, exact π/2, night fold, rain/thunder, low-light window) |
+| 2 | Upgrade maths extracted to `UpgradeMath.apply/multiplier`, used for transfer rate, capacity and efficiency | `UpgradeMathTest` |
+| 5 | Already delivered with I8 (`BaseInventory` owner → `markDirty`) | — |
+| 6 | **Kept deliberately.** 1.7.10's vanilla `Container.mergeItemStack` does **not** call `Slot.isItemValid` in its existing-stack loop, so removing the override would let the normal merge path grow an upgrade stack past the per-panel maximum. | existing container tests |
+| 10 | `isShiftKeyDown` moved to `ClientUtils`; `Utils` no longer references LWJGL | — |
+
+**R2 (done)**
+
+| # | Change | Tests |
+| --- | --- | --- |
+| 7 | Slot vocabulary: container-slot parameters and `isUpgradeSlot(int)` in `ContainerSolarPanel`; `slotClick` reads through the `Slot` instead of assuming container slot N is inventory slot N; `UPGRADE_SLOTS` removed | existing container tests |
+| 8 | `LogHelper` deleted; `SolarFluxMod.log` is a Log4j2 `Logger`, `%s`/`%d` converted to `{}`, the nine `printStackTrace()` calls replaced by `log.warn(..., e)` | `spotlessCheck` + the game/client launches exercise the logger |
+| 9 | One null-check style: `Objects.requireNonNull` everywhere, `checkArgument`/`checkState` replaced by explicit exceptions | compilation + the existing tests |
+
+**R3 (done)**
+
+| # | Change | Tests |
+| --- | --- | --- |
+| 3 | `ConfigSource` seam: `ForgeConfigSource` adapts the real file, `MapConfigSource` is the in-memory fake; `loadRestartSafeConfiguration`, `loadUpgradesConfiguration` and `parseTierConfigurations` now take a source instead of reading the static `Configuration` | `ModConfigurationLoadTest` (map source drives every general/upgrade value, defaults on an empty source, gap in Active flags keeps the indices, derived tier beyond the defaults) |
+
+Still open in §3: 4 (split the tile entity).
+
 ---
 
 ## 4. Dead code / unused surface
 
 | Item | Evidence | Action |
 | --- | --- | --- |
-| `WaferSawItem` | Only referenced by its own class and `UpgradeItemTest`; never constructed or registered; the class carries `// TODO the class is not used yet` | Delete, or finish the silicon-wafer feature and register it |
-| `MetricUnits.TERA` | No references | Delete (or use it in a size formatter) |
-| `Color.BLACK`, `Color.WHITE` | Defined but never used | Delete |
-| `BlockPosition.forward()` | No references (only `move()` is used) | Delete |
-| `BaseModContainer.CLICK_MODE_SHIFT/KEY/PICK_ITEM/OUTSIDE/DRAG_*`, `FAKE_SLOT_ID`, `MOUSE_*` | Only `CLICK_MODE_NORMAL`, `MOUSE_LEFT_CLICK` and `MOUSE_RIGHT_CLICK` are used | Delete the rest or use them in the `slotClick` rewrite |
-| `LogHelper.all/trace/off/fatal` | No callers (only `info` is used, 18×) | Collapse `LogHelper` to the logger (§3.8) |
+| `WaferSawItem` | Only referenced by its own class and `UpgradeItemTest`; never constructed or registered | **Deleted in R1** (and its two tests) |
+| `MetricUnits.TERA` | No references | **Deleted in R1** (+ test assert) |
+| `Color.BLACK`, `Color.WHITE` | Defined but never used | **Deleted in R1** (+ test asserts) |
+| `BlockPosition.forward()` | No references (only `move()` is used) | **Deleted in R1** (+ its test) |
+| `BaseModContainer` unused click constants | Only `CLICK_MODE_NORMAL`, `MOUSE_LEFT_CLICK` and `MOUSE_RIGHT_CLICK` are used | **Deleted in R1** (the three used ones stay) |
+| `LogHelper.all/trace/off/fatal` | No callers | **Class deleted in R2**; calls use `SolarFluxMod.log` (Log4j2) directly |
 | `StatefulEnergyStorage(int)` / `(int,int,int)` | Production only ever calls the 2-arg constructor (`SolarPanelTileEntity:70`); the 1-arg and 3-arg forms exist only for tests | Keep (useful API), or document them as test convenience constructors |
 | `TierConfiguration(int, int)` | Used only by `DEFAULT_TIER_CONFIGURATIONS`; the `generation * 8` rule is implicit and is the root of E2's invisibility | Make the transfer explicit in the defaults (a documented constant) or keep and document |
 | `getConfiguration()` | Only used by `ModConfigurationGui` | Keep, but it leaks the mutable Forge `Configuration` (C4) |
 | `mInstance` public static | Used by `SolarPanelBlock.openGui` | Keep (standard 1.7.10), but consider `@Mod.Instance` + a getter |
 
-Dead *tests* are also worth mentioning: `UpgradeItemTest` spends two tests on `WaferSawItem` (dead),
-while `TraversalEnergyDispenserModule` — 70 lines of graph search — has no test at all.
+Dead *tests*: `UpgradeItemTest` no longer spends two tests on `WaferSawItem` (deleted), and
+`TraversalEnergyDispenserModule` now has a dedicated test class (batches M1/P2).
 
 ---
 
@@ -781,9 +891,13 @@ behaviours that were just found:
   `spotlessCheck checkstyleMain`) so style drift cannot land through the game-test path. The
   reusable `build-and-test.yml` already runs `check`, but the explicit workflow is what developers
   copy.
-* Raise the JaCoCo floor after the first batch of tests. Measured baseline is 48.6/53.2 with a 46/50
-  gate; once the P0 tests land, set it to the new measured value minus ~1 point, and add the
-  per-package rules from §6.2 so a single huge uncovered class cannot hide.
+* The client half (`./gradlew runClient -PgameTest`) is fully automated — it exits with the result — but
+  it needs a display. On CI that means `xvfb-run` plus a software GL stack (Mesa/llvmpipe); it is not
+  wired into `game-test.yml` yet because that setup is unverified here. Run it locally or on a
+  self-hosted runner with a GPU.
+* Raise the JaCoCo floor. Measured baseline is 52.3/59.9 with a 46/50 gate; set the floor to the
+  measured value minus ~1 point, and add the per-package rules from §6.2 so a single huge uncovered
+  class cannot hide.
 * Add `jacocoTestReport` as a dependency of `check` (currently only `jacocoTestCoverageVerification`
   is wired), so the HTML is always fresh after `./gradlew check`.
 * Consider `diff-cover` (or a `jacocoTestCoverageVerification` rule on new classes) in PR CI: the

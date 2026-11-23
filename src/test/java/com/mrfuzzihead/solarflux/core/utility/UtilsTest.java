@@ -8,18 +8,37 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import net.minecraft.entity.EntityLivingBase;
 import net.minecraft.entity.item.EntityItem;
 import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.world.World;
 
+import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 
 import com.mrfuzzihead.solarflux.support.TestFixture;
 
+import cofh.api.item.IToolHammer;
+import cpw.mods.fml.common.ModAPIManager;
+
 public class UtilsTest {
+
+    @Before
+    public void provideAnEmptyApiRegistry() {
+        // ModAPIManager.apiContainers is only populated by the FML launch; without it hasAPI() throws. An empty map
+        // is the truthful state of a headless test: no BuildCraft API is installed.
+        if (TestFixture.getField(ModAPIManager.INSTANCE, "apiContainers") == null) {
+            TestFixture.setInstanceField(
+                ModAPIManager.INSTANCE,
+                ModAPIManager.class,
+                "apiContainers",
+                new java.util.HashMap<>());
+        }
+    }
 
     /** A world that can be handed to {@code new EntityItem(...)}: the Entity constructor reads the dimension id. */
     private static World newItemDropWorld() {
@@ -135,6 +154,34 @@ public class UtilsTest {
         when(player.getCurrentEquippedItem()).thenReturn(null);
 
         assertFalse(Utils.hasUsableWrench(player, 0, 0, 0));
+    }
+
+    @Test
+    public void aCoFHHammerCountsAsAWrench() {
+        EntityPlayer player = mock(EntityPlayer.class);
+        when(player.getCurrentEquippedItem()).thenReturn(new ItemStack(new TestHammer(), 1));
+
+        assertTrue(Utils.hasUsableWrench(player, 3, 64, -7));
+    }
+
+    @Test
+    public void aPlainItemIsNotAWrench() {
+        EntityPlayer player = mock(EntityPlayer.class);
+        when(player.getCurrentEquippedItem()).thenReturn(TestFixture.stack(1, 0));
+
+        assertFalse(Utils.hasUsableWrench(player, 0, 0, 0));
+    }
+
+    /** The CoFH API interface, so the code path is the same one Thermal Expansion's hammer takes. */
+    private static final class TestHammer extends Item implements IToolHammer {
+
+        @Override
+        public boolean isUsable(ItemStack pStack, EntityLivingBase pUser, int pX, int pY, int pZ) {
+            return true;
+        }
+
+        @Override
+        public void toolUsed(ItemStack pStack, EntityLivingBase pUser, int pX, int pY, int pZ) {}
     }
 
     @Test
