@@ -21,7 +21,11 @@ import cpw.mods.fml.common.registry.GameRegistry;
     name = Reference.MOD_NAME,
     version = Reference.VERSION,
     guiFactory = Reference.GUI_FACTORY,
-    dependencies = "after:" + Reference.THERMAL_EXPANSION_MOD_ID + ";after:" + Reference.THERMAL_FOUNDATION_MOD_ID)
+    dependencies = "required-after:" + Reference.COFH_CORE_MOD_ID
+        + ";after:"
+        + Reference.THERMAL_EXPANSION_MOD_ID
+        + ";after:"
+        + Reference.THERMAL_FOUNDATION_MOD_ID)
 public class SolarFluxMod {
 
     @Mod.Instance(Reference.MOD_ID)
