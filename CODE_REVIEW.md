@@ -26,9 +26,9 @@ Baseline measurements:
 | Branch coverage (filtered) | 371 / 584 = **63.5 %** |
 | Coverage gate | 55 % line / 55 % branch + per-package rules (8.4 / 8.5 points below actual) |
 | Excluded from the gate | only the client-only screens: `GuiSolarPanel`, `core.gui.BaseModGui`, the two config-GUI classes, `client/**`, `creativetab/**`, `Tags` |
-| Server game-test checks | **158 / 158** passing (`./gradlew gameTestServer`) |
+| Server game-test checks | **187 / 187** passing (`./gradlew gameTestServer`) |
 | Client game-test checks | **6 / 6** passing (`./gradlew runClient -PgameTest`) |
-| Game-test coverage (separate report, server run) | 922 / 1481 lines = **62.3 %**, branches 40.2 % |
+| Game-test coverage (separate report, server run) | 1032 / 1481 lines = **69.7 %**, branches 51.1 % |
 
 The suite is in good shape for its age: `StatefulEnergyStorage` (100 %), `BaseInventory` (97 %),
 `ConnectedIconHandler` (97 %), `core.utility` (93 %) and `items` (79 %) are well covered. The gaps are
@@ -868,11 +868,10 @@ the fix holds.
 
 ### 6.4 Game-test additions (`src/gameTest`)
 
-**Status:** the game test already covers registration/names, recipe presence, placement, the noon
-generation check, energy transfer, the NBT round trip, the runtime reload, wrench handling and the
-tier gap. Still open from this list: 56 (upgrades through the inventory at runtime), 57 (traversal
-chain), 58 (energy sharing), 59 (dismantle → place round trip), 60 (furnace), 61 (recipe content) and
-64 (sync keys).
+**Status:** 56 (upgrades through the inventory), 57 (traversal chain), 58 (energy sharing), 59
+(dismantle → place round trip), 60 (furnace) and 61 (recipe content) are now covered, on top of the
+already-covered 62 (registry/names) and 64 (sync keys). 55's curve is unit-tested and the noon wiring
+is in the game test; 63 is partially covered by `checksConfiguration`.
 
 These cover the parts a unit test genuinely cannot. The current suite is good; the gaps are the
 behaviours that were just found:
@@ -946,7 +945,8 @@ registration classes, the mod entry point and the rendering/config GUI code — 
 Forge launch or a booted client, and the game test is the right home for them.
 
 **Status:** waves 0–4 are done (288 unit tests, 63.4 % line / 63.5 % branch, with the bundle floor at
-55/55 and per-package rules). Wave 5 is partially open; §6.4 lists the remaining scenarios.
+55/55 and per-package rules). Wave 5 is mostly done too: the game test now runs **187 checks** at
+69.7 % line / 51.1 % branch; §6.4 lists the few remaining scenarios.
 
 ---
 

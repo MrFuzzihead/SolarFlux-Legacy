@@ -1,6 +1,8 @@
 package com.mrfuzzihead.solarflux.gametest;
 
 import net.minecraft.block.Block;
+import net.minecraft.entity.item.EntityItem;
+import net.minecraft.init.Blocks;
 import net.minecraft.init.Items;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
@@ -9,15 +11,18 @@ import net.minecraft.item.crafting.IRecipe;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.network.play.server.S35PacketUpdateTileEntity;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.tileentity.TileEntityFurnace;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
 import net.minecraftforge.common.config.Configuration;
 import net.minecraftforge.common.util.FakePlayer;
 import net.minecraftforge.common.util.FakePlayerFactory;
 import net.minecraftforge.common.util.ForgeDirection;
+import net.minecraftforge.oredict.ShapedOreRecipe;
 
 import com.mrfuzzihead.solarflux.blocks.SolarPanelBlock;
 import com.mrfuzzihead.solarflux.blocks.SolarPanelTileEntity;
+import com.mrfuzzihead.solarflux.blocks.UpgradeMath;
 import com.mrfuzzihead.solarflux.config.ForgeConfigSource;
 import com.mrfuzzihead.solarflux.config.ModConfiguration;
 import com.mrfuzzihead.solarflux.config.TierConfiguration;
@@ -84,6 +89,7 @@ final class SolarFluxGameTests {
         checksConfiguration();
         checksRegistration();
         checksRecipes();
+        checksRecipeContent();
         checksPlacedPanel(pWorld);
         checksEnergyTransfer(pWorld);
         checksNbtRoundTrip(pWorld);
@@ -91,6 +97,11 @@ final class SolarFluxGameTests {
         checksWrench(pWorld);
         checksInactiveTierHandling();
         checksTileEntityId(pWorld);
+        checksUpgradesInPlace(pWorld);
+        checksTraversalChain(pWorld);
+        checksEnergySharing(pWorld);
+        checksDismantleRoundTrip(pWorld);
+        checksFurnaceUpgrade(pWorld);
     }
 
     /**
@@ -712,5 +723,308 @@ final class SolarFluxGameTests {
         }
 
         pWorld.setBlockToAir(x, TEST_HEIGHT, z);
+    }
+
+    // -------------------------------------------------------------------------------------------------------
+    // Upgrades, traversal, sharing, dismantle round trip and the furnace upgrade
+    // -------------------------------------------------------------------------------------------------------
+
+    /** In-place upgrades through the inventory must change the running panel and survive removal. */
+    private static void checksUpgradesInPlace(World pWorld) {
+        int x = 20;
+        int z = 0;
+        Block block = GameRegistry.findBlock(Reference.MOD_ID, "solar1");
+        pWorld.setBlock(x, TEST_HEIGHT, z, block);
+        TileEntity tileEntity = pWorld.getTileEntity(x, TEST_HEIGHT, z);
+        if (!(tileEntity instanceof SolarPanelTileEntity)) {
+            check(false, "the upgrades test needs a panel");
+            pWorld.setBlockToAir(x, TEST_HEIGHT, z);
+            return;
+        }
+        SolarPanelTileEntity panel = (SolarPanelTileEntity) tileEntity;
+        int baseCapacity = panel.getMaxEnergyStored();
+        int baseTransfer = panel.getEnergyStorage()
+            .getMaxTransferExtract();
+
+        panel.setInventorySlotContents(0, new ItemStack(ModItems.mUpgradeCapacity, 2));
+        panel.setInventorySlotContents(1, new ItemStack(ModItems.mUpgradeTransferRate, 2));
+        panel.markDirty();
+
+        checkEquals(
+            UpgradeMath.apply(
+                baseCapacity,
+                2,
+                ModConfiguration.getCapacityUpgradeIncrease(),
+                ModConfiguration.getCapacityUpgradeReturnsToScale()),
+            panel.getMaxEnergyStored(),
+            "two capacity upgrades must change the capacity");
+        checkEquals(
+            UpgradeMath.apply(
+                baseTransfer,
+                2,
+                ModConfiguration.getTransferRateUpgradeIncrease(),
+                ModConfiguration.getTransferRateUpgradeReturnsToScale()),
+            panel.getEnergyStorage()
+                .getMaxTransferExtract(),
+            "two transfer upgrades must change the transfer rate");
+
+        panel.setEnergyStored(panel.getMaxEnergyStored());
+        int upgradedEnergy = panel.getEnergyStored();
+        panel.setInventorySlotContents(0, null);
+        panel.markDirty();
+
+        checkEquals(baseCapacity, panel.getMaxEnergyStored(), "removing the capacity upgrades restores the base");
+        checkEquals(upgradedEnergy, panel.getEnergyStored(), "removing a capacity upgrade must not delete energy");
+
+        pWorld.setBlockToAir(x, TEST_HEIGHT, z);
+    }
+
+    /** A traversal upgrade must discover and feed the machine two blocks away. */
+    private static void checksTraversalChain(World pWorld) {
+        int x = 0;
+        int z = 20;
+        Block panelBlock = GameRegistry.findBlock(Reference.MOD_ID, "solar1");
+        Block receiverBlock = GameTestMod.getTestReceiverBlock();
+        pWorld.setBlock(x, TEST_HEIGHT, z, panelBlock);
+        pWorld.setBlock(x + 1, TEST_HEIGHT, z, receiverBlock);
+        pWorld.setBlock(x + 2, TEST_HEIGHT, z, receiverBlock);
+        SolarPanelTileEntity panel = (SolarPanelTileEntity) pWorld.getTileEntity(x, TEST_HEIGHT, z);
+        GameTestMod.TestEnergyReceiver first = (GameTestMod.TestEnergyReceiver) pWorld
+            .getTileEntity(x + 1, TEST_HEIGHT, z);
+        final GameTestMod.TestEnergyReceiver second = (GameTestMod.TestEnergyReceiver) pWorld
+            .getTileEntity(x + 2, TEST_HEIGHT, z);
+        if (panel == null || first == null || second == null) {
+            check(false, "the traversal chain arena could not be built");
+            clearBlocks(pWorld, x, z, 3);
+            return;
+        }
+
+        panel.setInventorySlotContents(0, new ItemStack(ModItems.mUpgradeTraversal, 1));
+        panel.markDirty();
+        panel.setEnergyStored(panel.getMaxEnergyStored());
+
+        int ticks = tickUntil(panel, pWorld, 200, new Condition() {
+
+            @Override
+            public boolean isTrue() {
+                return second.getEnergyStored() > 0;
+            }
+        });
+
+        check(ticks > 0, "the traversal upgrade must reach the second machine within 200 ticks");
+        check(first.getEnergyStored() > 0, "the direct neighbour must receive energy too");
+
+        clearBlocks(pWorld, x, z, 3);
+    }
+
+    /** Two adjacent panels must share their energy without creating or destroying any. */
+    private static void checksEnergySharing(World pWorld) {
+        int x = 0;
+        int z = 30;
+        Block block = GameRegistry.findBlock(Reference.MOD_ID, "solar1");
+        pWorld.setBlock(x, TEST_HEIGHT, z, block);
+        pWorld.setBlock(x + 1, TEST_HEIGHT, z, block);
+        SolarPanelTileEntity west = (SolarPanelTileEntity) pWorld.getTileEntity(x, TEST_HEIGHT, z);
+        SolarPanelTileEntity east = (SolarPanelTileEntity) pWorld.getTileEntity(x + 1, TEST_HEIGHT, z);
+        if (west == null || east == null) {
+            check(false, "the sharing arena could not be built");
+            clearBlocks(pWorld, x, z, 2);
+            return;
+        }
+
+        west.setEnergyStored(west.getMaxEnergyStored());
+        east.setEnergyStored(0);
+        int total = west.getEnergyStored() + east.getEnergyStorage()
+            .getEnergyStored();
+
+        // Midnight: otherwise the panels generate while we are only testing the sharing module.
+        long previousTime = pWorld.getWorldTime();
+        pWorld.setWorldTime(18000L);
+        try {
+            for (int tick = 0; tick < 300; ++tick) {
+                pWorld.getWorldInfo()
+                    .incrementTotalWorldTime(pWorld.getTotalWorldTime() + 1L);
+                west.updateEntity();
+                east.updateEntity();
+                if (west.getEnergyStored() > 0 && east.getEnergyStored() > 0) {
+                    break;
+                }
+            }
+        } finally {
+            pWorld.setWorldTime(previousTime);
+        }
+
+        check(west.getEnergyStored() > 0, "the full panel must keep some energy");
+        check(east.getEnergyStored() > 0, "the empty panel must receive shared energy");
+        checkEquals(total, west.getEnergyStored() + east.getEnergyStored(), "sharing must conserve energy");
+
+        clearBlocks(pWorld, x, z, 2);
+    }
+
+    /** Wrench it with the CoFH hammer, then place the drop back and check its contents. */
+    private static void checksDismantleRoundTrip(World pWorld) {
+        int x = 0;
+        int z = 40;
+        Block block = GameRegistry.findBlock(Reference.MOD_ID, "solar1");
+        pWorld.setBlock(x, TEST_HEIGHT, z, block);
+        SolarPanelTileEntity panel = (SolarPanelTileEntity) pWorld.getTileEntity(x, TEST_HEIGHT, z);
+        if (panel == null) {
+            check(false, "the dismantle round trip needs a panel");
+            pWorld.setBlockToAir(x, TEST_HEIGHT, z);
+            return;
+        }
+        panel.setEnergyStored(1234);
+        panel.setInventorySlotContents(0, new ItemStack(ModItems.mUpgradeEfficiency, 2));
+        panel.markDirty();
+
+        FakePlayer player = FakePlayerFactory.getMinecraft((WorldServer) pWorld);
+        try {
+            player.inventory.mainInventory[0] = new ItemStack(GameTestMod.getTestHammerItem());
+            player.inventory.currentItem = 0;
+            player.setSneaking(true);
+
+            check(
+                block.onBlockActivated(pWorld, x, TEST_HEIGHT, z, player, 1, 0.5F, 0.5F, 0.5F),
+                "the wrench click must be handled");
+            check(pWorld.isAirBlock(x, TEST_HEIGHT, z), "the panel must be dismantled");
+
+            EntityItem drop = findDrop(pWorld, x, TEST_HEIGHT, z);
+            check(drop != null, "dismantling must spawn the panel item");
+            if (drop == null) {
+                return;
+            }
+            ItemStack stack = drop.getEntityItem();
+            check(stack.getTagCompound() != null, "the drop must carry the panel contents");
+            if (stack.getTagCompound() != null) {
+                checkEquals(
+                    1234,
+                    stack.getTagCompound()
+                        .getInteger(NBTConstants.ENERGY),
+                    "the drop must carry the charge");
+            }
+
+            pWorld.setBlock(x, TEST_HEIGHT, z, block);
+            block.onBlockPlacedBy(pWorld, x, TEST_HEIGHT, z, player, stack);
+            SolarPanelTileEntity placed = (SolarPanelTileEntity) pWorld.getTileEntity(x, TEST_HEIGHT, z);
+            check(placed != null, "placing the drop must create a panel");
+            if (placed != null) {
+                checkEquals(1234, placed.getEnergyStored(), "the placed panel must keep its charge");
+                checkEquals(
+                    2,
+                    placed.getUpgradeCount(ModItems.mUpgradeEfficiency),
+                    "the placed panel must keep its upgrades");
+            }
+            drop.setDead();
+        } finally {
+            player.inventory.mainInventory[0] = null;
+            player.setSneaking(false);
+            pWorld.setBlockToAir(x, TEST_HEIGHT, z);
+        }
+    }
+
+    /** The furnace upgrade must prepay a real vanilla furnace. */
+    private static void checksFurnaceUpgrade(World pWorld) {
+        int x = 0;
+        int z = 50;
+        Block block = GameRegistry.findBlock(Reference.MOD_ID, "solar1");
+        pWorld.setBlock(x, TEST_HEIGHT, z, block);
+        pWorld.setBlock(x + 1, TEST_HEIGHT, z, Blocks.furnace);
+        SolarPanelTileEntity panel = (SolarPanelTileEntity) pWorld.getTileEntity(x, TEST_HEIGHT, z);
+        TileEntity tileEntity = pWorld.getTileEntity(x + 1, TEST_HEIGHT, z);
+        if (panel == null || !(tileEntity instanceof TileEntityFurnace)) {
+            check(false, "the furnace arena could not be built");
+            clearBlocks(pWorld, x, z, 2);
+            return;
+        }
+        TileEntityFurnace furnace = (TileEntityFurnace) tileEntity;
+        furnace.setInventorySlotContents(0, new ItemStack(Items.coal));
+        panel.setInventorySlotContents(0, new ItemStack(ModItems.mUpgradeFurnace, 1));
+        panel.markDirty();
+        panel.setEnergyStored(panel.getMaxEnergyStored());
+
+        boolean burning = false;
+        for (int tick = 0; tick < 400 && !burning; ++tick) {
+            pWorld.getWorldInfo()
+                .incrementTotalWorldTime(pWorld.getTotalWorldTime() + 1L);
+            panel.updateEntity();
+            burning = furnace.furnaceBurnTime > 0;
+        }
+
+        check(burning, "the furnace upgrade must light the furnace within 400 ticks");
+        check(
+            panel.getEnergyStored() < panel.getMaxEnergyStored(),
+            "the furnace upgrade must consume the panel's energy");
+
+        clearBlocks(pWorld, x, z, 2);
+    }
+
+    /** Every active tier above the first must use the previous tier in its recipe. */
+    private static void checksRecipeContent() {
+        for (int tier = 1; tier < ModBlocks.getSolarPanels()
+            .size(); ++tier) {
+            if (!ModConfiguration.getTierConfiguration(tier)
+                .isActive()) {
+                continue;
+            }
+            Block panel = ModBlocks.getSolarPanels()
+                .get(tier);
+            Block previous = ModBlocks.getSolarPanels()
+                .get(tier - 1);
+            ShapedOreRecipe recipe = findPanelRecipe(panel);
+            check(recipe != null, "tier " + (tier + 1) + " must have a shaped recipe");
+            if (recipe != null) {
+                check(recipeUses(recipe, previous), "the tier " + (tier + 1) + " recipe must use the tier " + tier);
+            }
+        }
+    }
+
+    private static ShapedOreRecipe findPanelRecipe(Block pPanel) {
+        for (Object entry : CraftingManager.getInstance()
+            .getRecipeList()) {
+            if (entry instanceof ShapedOreRecipe) {
+                ItemStack output = ((ShapedOreRecipe) entry).getRecipeOutput();
+                if (output != null && Block.getBlockFromItem(output.getItem()) == pPanel) {
+                    return (ShapedOreRecipe) entry;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static boolean recipeUses(ShapedOreRecipe pRecipe, Block pBlock) {
+        for (Object input : pRecipe.getInput()) {
+            if (input instanceof ItemStack) {
+                if (Block.getBlockFromItem(((ItemStack) input).getItem()) == pBlock) {
+                    return true;
+                }
+            } else if (input instanceof java.util.List) {
+                for (Object alternative : (java.util.List<?>) input) {
+                    if (alternative instanceof ItemStack
+                        && Block.getBlockFromItem(((ItemStack) alternative).getItem()) == pBlock) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
+    private static EntityItem findDrop(World pWorld, int pX, int pY, int pZ) {
+        for (Object entry : pWorld.loadedEntityList) {
+            if (entry instanceof EntityItem) {
+                EntityItem item = (EntityItem) entry;
+                if (Math.abs(item.posX - (pX + 0.5D)) < 1.5D && Math.abs(item.posY - (pY + 0.5D)) < 1.5D
+                    && Math.abs(item.posZ - (pZ + 0.5D)) < 1.5D) {
+                    return item;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static void clearBlocks(World pWorld, int pX, int pZ, int pCount) {
+        for (int i = 0; i < pCount; ++i) {
+            pWorld.setBlockToAir(pX + i, TEST_HEIGHT, pZ);
+        }
     }
 }
