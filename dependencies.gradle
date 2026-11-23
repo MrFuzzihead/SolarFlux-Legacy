@@ -37,4 +37,29 @@ dependencies {
     runtimeOnlyNonPublishable("com.github.GTNewHorizons:NotEnoughItems:2.9.13-GTNH:dev")
     compileOnly("com.github.GTNewHorizons:BuildCraft:7.2.2:dev")
     devOnlyNonPublishable("curse.maven:cofh-core-69162:2388751")
+
+    // Unit tests. JUnit 4.13.2 is the newest 4.x; the suite runs on a Java 8 toolchain because the mod targets
+    // Java 8 bytecode and Mockito 4.11.0 is the newest Mockito that still runs there (5.x needs Java 11).
+    // mockito-inline lets us mock final Minecraft classes (ItemStack and friends) on Java 8.
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.mockito:mockito-core:4.11.0")
+    testImplementation("org.mockito:mockito-inline:4.11.0")
+}
+
+// Minecraft 1.7.10's launcher library list pins three Scala modules in the old `org.scala-lang` group.
+// Those exact coordinates only existed on the unreachable OvermindDL1 mirror removed in repositories.gradle.
+// The same modules are published to Maven Central under `org.scala-lang.modules` at identical versions.
+// See coolsimulations/FloatingItems@f42408a.
+configurations.configureEach {
+    resolutionStrategy.dependencySubstitution {
+        [
+            ("scala-parser-combinators_2.11"): "1.0.1",
+            ("scala-swing_2.11")             : "1.0.1",
+            ("scala-xml_2.11")               : "1.0.2",
+        ].each { name, version ->
+            substitute module("org.scala-lang:${name}:${version}") using module("org.scala-lang.modules:${name}:${version}") because(
+                "The old org.scala-lang coordinate is only on the unreachable OvermindDL1 mirror; org.scala-lang.modules is the Maven Central location"
+            )
+        }
+    }
 }

@@ -1,5 +1,11 @@
 // Add any additional repositories for your dependencies here.
 
 repositories {
-
+    // GTNHGradle unconditionally registers the "OvermindDL1 Forge repo mirror"
+    // (https://gregtech.overminddl1.com/). That host is frequently unreachable from GitHub-hosted runners, and
+    // Gradle treats a repository network failure as fatal instead of falling through to the next repository.
+    // Nothing this project needs is hosted only there: the 1.7.10-era Scala artifacts are substituted to their
+    // Maven Central coordinates in dependencies.gradle.
+    // See coolsimulations/FloatingItems@f42408a.
+    removeAll { it.name == "OvermindDL1 Forge repo mirror" }
 }
