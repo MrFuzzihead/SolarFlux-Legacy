@@ -3,14 +3,14 @@ package com.nauktis.solarflux.init;
 import java.util.List;
 
 import com.google.common.collect.Lists;
-import com.nauktis.core.block.BaseModBlock;
-import com.nauktis.core.block.icon.ConnectedIconHandler;
-import com.nauktis.core.block.icon.IBlockIconHandler;
-import com.nauktis.core.block.icon.SingleIconHandler;
-import com.nauktis.core.block.icon.TopIconHandler;
 import com.nauktis.solarflux.SolarFluxMod;
 import com.nauktis.solarflux.blocks.SolarPanelBlock;
 import com.nauktis.solarflux.config.ModConfiguration;
+import com.nauktis.solarflux.core.block.BaseModBlock;
+import com.nauktis.solarflux.core.block.icon.ConnectedIconHandler;
+import com.nauktis.solarflux.core.block.icon.IBlockIconHandler;
+import com.nauktis.solarflux.core.block.icon.SingleIconHandler;
+import com.nauktis.solarflux.core.block.icon.TopIconHandler;
 import com.nauktis.solarflux.items.SolarPanelItemBlock;
 import com.nauktis.solarflux.reference.Reference;
 

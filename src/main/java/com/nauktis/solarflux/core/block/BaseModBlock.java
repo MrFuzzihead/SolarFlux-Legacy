@@ -1,4 +1,4 @@
-package com.nauktis.core.block;
+package com.nauktis.solarflux.core.block;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -8,7 +8,7 @@ import net.minecraft.client.renderer.texture.IIconRegister;
 import net.minecraft.util.IIcon;
 import net.minecraft.world.IBlockAccess;
 
-import com.nauktis.core.block.icon.IBlockIconHandler;
+import com.nauktis.solarflux.core.block.icon.IBlockIconHandler;
 
 public class BaseModBlock extends Block {
 

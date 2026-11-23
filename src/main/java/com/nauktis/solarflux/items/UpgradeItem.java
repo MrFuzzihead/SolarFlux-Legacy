@@ -6,8 +6,8 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 
 import com.google.common.collect.Lists;
-import com.nauktis.core.utility.Color;
-import com.nauktis.core.utility.Utils;
+import com.nauktis.solarflux.core.utility.Color;
+import com.nauktis.solarflux.core.utility.Utils;
 import com.nauktis.solarflux.utility.Lang;
 
 public class UpgradeItem extends SFItem {

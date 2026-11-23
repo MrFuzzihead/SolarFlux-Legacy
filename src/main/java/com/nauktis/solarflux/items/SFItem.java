@@ -1,6 +1,6 @@
 package com.nauktis.solarflux.items;
 
-import com.nauktis.core.item.BaseModItem;
+import com.nauktis.solarflux.core.item.BaseModItem;
 import com.nauktis.solarflux.creativetab.ModCreativeTab;
 import com.nauktis.solarflux.reference.Reference;
 

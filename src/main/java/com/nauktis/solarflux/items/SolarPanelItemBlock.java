@@ -7,9 +7,9 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemBlock;
 import net.minecraft.item.ItemStack;
 
-import com.nauktis.core.utility.Color;
 import com.nauktis.solarflux.blocks.SolarPanelBlock;
 import com.nauktis.solarflux.config.ModConfiguration;
+import com.nauktis.solarflux.core.utility.Color;
 import com.nauktis.solarflux.reference.NBTConstants;
 import com.nauktis.solarflux.utility.Lang;
 

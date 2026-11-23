@@ -1,4 +1,4 @@
-package com.nauktis.core.utility;
+package com.nauktis.solarflux.core.utility;
 
 import net.minecraftforge.common.util.ForgeDirection;
 

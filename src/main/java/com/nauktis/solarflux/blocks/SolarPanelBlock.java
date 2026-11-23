@@ -9,11 +9,11 @@ import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.IIcon;
 import net.minecraft.world.World;
 
-import com.nauktis.core.block.BaseModBlockWithTileEntity;
-import com.nauktis.core.block.icon.IBlockIconHandler;
-import com.nauktis.core.utility.Utils;
 import com.nauktis.solarflux.SolarFluxMod;
 import com.nauktis.solarflux.config.ModConfiguration;
+import com.nauktis.solarflux.core.block.BaseModBlockWithTileEntity;
+import com.nauktis.solarflux.core.block.icon.IBlockIconHandler;
+import com.nauktis.solarflux.core.utility.Utils;
 import com.nauktis.solarflux.creativetab.ModCreativeTab;
 import com.nauktis.solarflux.reference.NBTConstants;
 import com.nauktis.solarflux.reference.Reference;

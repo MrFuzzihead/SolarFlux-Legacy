@@ -1,4 +1,4 @@
-package com.nauktis.core.block;
+package com.nauktis.solarflux.core.block;
 
 import net.minecraft.block.Block;
 import net.minecraft.block.ITileEntityProvider;
@@ -7,8 +7,8 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.tileentity.TileEntity;
 import net.minecraft.world.World;
 
-import com.nauktis.core.block.icon.IBlockIconHandler;
-import com.nauktis.core.utility.Utils;
+import com.nauktis.solarflux.core.block.icon.IBlockIconHandler;
+import com.nauktis.solarflux.core.utility.Utils;
 
 public abstract class BaseModBlockWithTileEntity extends BaseModBlock implements ITileEntityProvider {
 

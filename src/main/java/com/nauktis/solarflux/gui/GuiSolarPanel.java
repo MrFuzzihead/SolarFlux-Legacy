@@ -6,8 +6,8 @@ import net.minecraft.util.ResourceLocation;
 
 import org.lwjgl.opengl.GL11;
 
-import com.nauktis.core.gui.BaseModGui;
 import com.nauktis.solarflux.blocks.SolarPanelTileEntity;
+import com.nauktis.solarflux.core.gui.BaseModGui;
 import com.nauktis.solarflux.reference.Reference;
 import com.nauktis.solarflux.utility.Lang;
 

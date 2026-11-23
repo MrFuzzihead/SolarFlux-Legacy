@@ -1,4 +1,4 @@
-package com.nauktis.core.tileentity;
+package com.nauktis.solarflux.core.tileentity;
 
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;

@@ -1,4 +1,4 @@
-package com.nauktis.core.gui;
+package com.nauktis.solarflux.core.gui;
 
 import java.util.List;
 import java.util.Map;
@@ -11,7 +11,7 @@ import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
 
 import com.google.common.collect.Maps;
-import com.nauktis.core.utility.Utils;
+import com.nauktis.solarflux.core.utility.Utils;
 
 /**
  * Base class for any Container.

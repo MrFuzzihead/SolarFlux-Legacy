@@ -1,4 +1,4 @@
-package com.nauktis.core.gui;
+package com.nauktis.solarflux.core.gui;
 
 import java.util.Collections;
 import java.util.List;

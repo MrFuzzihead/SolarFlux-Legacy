@@ -1,8 +1,8 @@
 package com.nauktis.solarflux;
 
-import com.nauktis.core.utility.LogHelper;
 import com.nauktis.solarflux.blocks.SolarPanelTileEntity;
 import com.nauktis.solarflux.config.ModConfiguration;
+import com.nauktis.solarflux.core.utility.LogHelper;
 import com.nauktis.solarflux.gui.GuiHandler;
 import com.nauktis.solarflux.init.ModBlocks;
 import com.nauktis.solarflux.init.ModItems;

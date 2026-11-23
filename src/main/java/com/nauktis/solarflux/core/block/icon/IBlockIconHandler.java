@@ -1,4 +1,4 @@
-package com.nauktis.core.block.icon;
+package com.nauktis.solarflux.core.block.icon;
 
 import net.minecraft.client.renderer.texture.IIconRegister;
 import net.minecraft.util.IIcon;

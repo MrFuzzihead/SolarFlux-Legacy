@@ -7,9 +7,9 @@ import net.minecraftforge.common.util.ForgeDirection;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import com.nauktis.core.utility.BlockPosition;
 import com.nauktis.solarflux.blocks.SolarPanelTileEntity;
 import com.nauktis.solarflux.config.ModConfiguration;
+import com.nauktis.solarflux.core.utility.BlockPosition;
 import com.nauktis.solarflux.init.ModItems;
 
 public class TraversalEnergyDispenserModule extends SimpleEnergyDispenserModule {

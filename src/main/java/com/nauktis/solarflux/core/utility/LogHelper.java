@@ -1,4 +1,4 @@
-package com.nauktis.core.utility;
+package com.nauktis.solarflux.core.utility;
 
 import org.apache.logging.log4j.Level;
 

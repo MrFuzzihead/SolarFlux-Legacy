@@ -5,9 +5,9 @@ import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.inventory.Slot;
 import net.minecraft.item.ItemStack;
 
-import com.nauktis.core.gui.BaseModContainer;
-import com.nauktis.core.utility.Utils;
 import com.nauktis.solarflux.blocks.SolarPanelTileEntity;
+import com.nauktis.solarflux.core.gui.BaseModContainer;
+import com.nauktis.solarflux.core.utility.Utils;
 import com.nauktis.solarflux.items.UpgradeItem;
 
 import cpw.mods.fml.relauncher.Side;

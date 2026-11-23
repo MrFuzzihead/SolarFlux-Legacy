@@ -8,8 +8,8 @@ import net.minecraftforge.common.config.Configuration;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import com.nauktis.core.utility.MetricUnits;
 import com.nauktis.solarflux.SolarFluxMod;
+import com.nauktis.solarflux.core.utility.MetricUnits;
 import com.nauktis.solarflux.reference.Reference;
 
 import cpw.mods.fml.client.event.ConfigChangedEvent;

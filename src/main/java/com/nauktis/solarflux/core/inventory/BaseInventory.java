@@ -1,4 +1,4 @@
-package com.nauktis.core.inventory;
+package com.nauktis.solarflux.core.inventory;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
