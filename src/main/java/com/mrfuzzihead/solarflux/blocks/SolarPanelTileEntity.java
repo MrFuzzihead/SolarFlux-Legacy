@@ -1,7 +1,5 @@
 package com.mrfuzzihead.solarflux.blocks;
 
-import java.util.Map;
-
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.item.Item;
@@ -9,8 +7,6 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraftforge.common.util.ForgeDirection;
 
-import com.google.common.base.Objects;
-import com.google.common.collect.Maps;
 import com.mrfuzzihead.solarflux.blocks.modules.EnergySharingModule;
 import com.mrfuzzihead.solarflux.blocks.modules.ITileEntityModule;
 import com.mrfuzzihead.solarflux.blocks.modules.SimpleEnergyDispenserModule;
@@ -33,23 +29,13 @@ public class SolarPanelTileEntity extends BaseModTileEntitySynced implements IIn
      * Random number to avoid having all panels performing costly operations during the same tick.
      */
     private final short mTickShift;
-    private final StatefulEnergyStorage mEnergyStorage;
+    private final PanelEnergy mEnergy;
     /**
      * Index of this tier of SolarPanel.
      */
     private int mTierIndex;
     private ITileEntityModule mEnergySharingModule;
     private ITileEntityModule mEnergyDispenserModule = new SimpleEnergyDispenserModule(this);
-    /**
-     * The amount of RF currently generated per tick.
-     */
-    private int mCurrentEnergyGeneration;
-
-    /**
-     * The amount of light that the solar panel can see.
-     * This is only updated on the server and is sent to the client.
-     */
-    private float mSunIntensity;
 
     /**
      * Energy already extracted from the storage as a prepayment for the furnace upgrade. Kept on the panel rather than
@@ -59,13 +45,9 @@ public class SolarPanelTileEntity extends BaseModTileEntitySynced implements IIn
     private int mFurnaceEnergyBuffer;
 
     private BaseInventory mInventory = new BaseInventory("container.solarflux.panel", INVENTORY_SIZE, this);
-    private Map<Item, Integer> mUpgradeCache = Maps.newHashMap();
-    /** Snapshot of the slots the cache was built from, so an unrelated {@code markDirty} does not rebuild it. */
-    private final ItemStack[] mCachedSlotStacks = new ItemStack[INVENTORY_SIZE];
-    private final int[] mCachedSlotSizes = new int[INVENTORY_SIZE];
-    private boolean mUpgradeCacheValid;
+    private final PanelUpgrades mUpgrades = new PanelUpgrades(mInventory);
     private int mUpgradeCacheRebuilds;
-    private int mCachedConfigurationVersion = Integer.MIN_VALUE;
+    private int mAppliedConfigurationVersion = Integer.MIN_VALUE;
 
     public SolarPanelTileEntity() {
         // An empty constructor is always required as it is used when loading a TileEntity from NBT.
@@ -75,7 +57,7 @@ public class SolarPanelTileEntity extends BaseModTileEntitySynced implements IIn
     public SolarPanelTileEntity(int pTierIndex) {
         mTierIndex = pTierIndex;
         mTickShift = (short) Utils.RANDOM.nextInt(5 * 20);
-        mEnergyStorage = new StatefulEnergyStorage(
+        mEnergy = new PanelEnergy(
             ModConfiguration.getTierConfiguration(mTierIndex)
                 .getCapacity(),
             ModConfiguration.getTierConfiguration(mTierIndex)
@@ -116,11 +98,11 @@ public class SolarPanelTileEntity extends BaseModTileEntitySynced implements IIn
      * Returns the internal RF storage of the SolarPanel.
      */
     public StatefulEnergyStorage getEnergyStorage() {
-        return mEnergyStorage;
+        return mEnergy.storage();
     }
 
     public int getCurrentEnergyGeneration() {
-        return mCurrentEnergyGeneration;
+        return mEnergy.currentGeneration();
     }
 
     public int getFurnaceEnergyBuffer() {
@@ -136,7 +118,7 @@ public class SolarPanelTileEntity extends BaseModTileEntitySynced implements IIn
      * This must only be used on the client to set the value received by the server.
      */
     public void setCurrentEnergyGeneration(int pCurrentEnergyGeneration) {
-        mCurrentEnergyGeneration = pCurrentEnergyGeneration;
+        mEnergy.setCurrentGeneration(pCurrentEnergyGeneration);
     }
 
     public int getMaximumEnergyGeneration() {
@@ -149,45 +131,47 @@ public class SolarPanelTileEntity extends BaseModTileEntitySynced implements IIn
     private void updateCurrentEnergyGeneration() {
         computeSunIntensity();
 
-        double energyGeneration = getMaximumEnergyGeneration() * mSunIntensity;
+        double energyGeneration = getMaximumEnergyGeneration() * mEnergy.sunIntensity();
         energyGeneration *= UpgradeMath.multiplier(
             getUpgradeCount(ModItems.mUpgradeEfficiency),
             ModConfiguration.getEfficiencyUpgradeIncrease(),
             ModConfiguration.getEfficiencyUpgradeReturnsToScale());
 
-        mCurrentEnergyGeneration = (int) Math.round(energyGeneration);
+        mEnergy.setCurrentGeneration((int) Math.round(energyGeneration));
     }
 
     public float getSunIntensity() {
-        return mSunIntensity;
+        return mEnergy.sunIntensity();
     }
 
     /**
      * This must only be used on the client to set the value received by the server.
      */
     public void setSunIntensity(float pSunIntensity) {
-        mSunIntensity = pSunIntensity;
+        mEnergy.setSunIntensity(pSunIntensity);
     }
 
     /**
      * Compute the intensity of the sun that can be used by the Solar Panel.
      */
     private void computeSunIntensity() {
-        mSunIntensity = SunIntensity.calculate(
-            worldObj.canBlockSeeTheSky(xCoord, yCoord + 1, zCoord),
-            worldObj.getCelestialAngleRadians(1.0F),
-            worldObj.isRaining(),
-            worldObj.isThundering(),
-            getUpgradeCount(ModItems.mUpgradeLowLight),
-            ModConfiguration.getRainGenerationFactor(),
-            ModConfiguration.getThunderGenerationFactor());
+        mEnergy.setSunIntensity(
+            SunIntensity.calculate(
+                worldObj.canBlockSeeTheSky(xCoord, yCoord + 1, zCoord),
+                worldObj.getCelestialAngleRadians(1.0F),
+                worldObj.isRaining(),
+                worldObj.isThundering(),
+                getUpgradeCount(ModItems.mUpgradeLowLight),
+                ModConfiguration.getRainGenerationFactor(),
+                ModConfiguration.getThunderGenerationFactor()));
     }
 
     protected void generateEnergy() {
-        if (mCurrentEnergyGeneration > 0) {
+        if (mEnergy.currentGeneration() > 0) {
             // Generation is limited by the tier's generation rate, not by the transfer rate used to hand energy to
             // neighbours (the two are only equal for the default tiers).
-            getEnergyStorage().addEnergy(mCurrentEnergyGeneration);
+            mEnergy.storage()
+                .addEnergy(mEnergy.currentGeneration());
         }
     }
 
@@ -195,24 +179,14 @@ public class SolarPanelTileEntity extends BaseModTileEntitySynced implements IIn
      * Goes through the inventory and counts the number of each upgrade.
      */
     private void refreshUpgradeCache() {
-        if (slotsMatchCache()) {
+        boolean countsChanged = mUpgrades.refreshIfNeeded();
+        int configurationVersion = ModConfiguration.getConfigurationVersion();
+        boolean configurationChanged = configurationVersion != mAppliedConfigurationVersion;
+        if (!countsChanged && !configurationChanged) {
             return;
         }
-        rememberSlots();
+        mAppliedConfigurationVersion = configurationVersion;
         ++mUpgradeCacheRebuilds;
-
-        mUpgradeCache.clear();
-        for (int i = 0; i < getSizeInventory(); ++i) {
-            ItemStack itemStack = getStackInSlot(i);
-            if (itemStack != null && itemStack.getItem() instanceof UpgradeItem) {
-                if (mUpgradeCache.containsKey(itemStack.getItem())) {
-                    mUpgradeCache
-                        .put(itemStack.getItem(), itemStack.stackSize + mUpgradeCache.get(itemStack.getItem()));
-                } else {
-                    mUpgradeCache.put(itemStack.getItem(), itemStack.stackSize);
-                }
-            }
-        }
 
         // Do we have any upgrade for traversal?
         if (getUpgradeCount(ModItems.mUpgradeTraversal) > 0
@@ -242,48 +216,13 @@ public class SolarPanelTileEntity extends BaseModTileEntitySynced implements IIn
                 ModConfiguration.getCapacityUpgradeReturnsToScale()));
     }
 
-    /**
-     * True when every slot still holds the same stack (identity) with the same size. {@code markDirty()} is called for
-     * reasons unrelated to the inventory (saves, block updates), and a shift-click fires it once per merged slot; in
-     * both cases the cache would be rebuilt for nothing.
-     */
-    private boolean slotsMatchCache() {
-        if (!mUpgradeCacheValid || mCachedConfigurationVersion != ModConfiguration.getConfigurationVersion()) {
-            return false;
-        }
-        for (int i = 0; i < INVENTORY_SIZE; ++i) {
-            ItemStack stack = getStackInSlot(i);
-            if (stack != mCachedSlotStacks[i]) {
-                return false;
-            }
-            if (stack != null && stack.stackSize != mCachedSlotSizes[i]) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private void rememberSlots() {
-        for (int i = 0; i < INVENTORY_SIZE; ++i) {
-            ItemStack stack = getStackInSlot(i);
-            mCachedSlotStacks[i] = stack;
-            mCachedSlotSizes[i] = stack == null ? 0 : stack.stackSize;
-        }
-        mUpgradeCacheValid = true;
-        mCachedConfigurationVersion = ModConfiguration.getConfigurationVersion();
-    }
-
     /** Visible for tests: how many times the cache was actually rebuilt. */
     int getUpgradeCacheRebuilds() {
         return mUpgradeCacheRebuilds;
     }
 
     public int getTotalUpgradeInstalled() {
-        int count = 0;
-        for (int value : mUpgradeCache.values()) {
-            count += value;
-        }
-        return count;
+        return mUpgrades.getTotal();
     }
 
     /**
@@ -301,11 +240,7 @@ public class SolarPanelTileEntity extends BaseModTileEntitySynced implements IIn
     }
 
     public int getUpgradeCount(Item pItem) {
-        if (pItem != null) {
-            Integer count = mUpgradeCache.get(pItem);
-            return count == null ? 0 : count;
-        }
-        return 0;
+        return mUpgrades.getCount(pItem);
     }
 
     @Override
@@ -316,18 +251,21 @@ public class SolarPanelTileEntity extends BaseModTileEntitySynced implements IIn
         mTierIndex = ModConfiguration.clampTierIndex(pNBT.getInteger(NBTConstants.TIER_INDEX));
 
         // Update Energy Storage with Tier Configuration
-        mEnergyStorage.setMaxEnergyStored(
-            ModConfiguration.getTierConfiguration(mTierIndex)
-                .getCapacity());
-        mEnergyStorage.setMaxTransfer(
-            ModConfiguration.getTierConfiguration(mTierIndex)
-                .getMaximumEnergyTransfer());
+        mEnergy.storage()
+            .setMaxEnergyStored(
+                ModConfiguration.getTierConfiguration(mTierIndex)
+                    .getCapacity());
+        mEnergy.storage()
+            .setMaxTransfer(
+                ModConfiguration.getTierConfiguration(mTierIndex)
+                    .getMaximumEnergyTransfer());
 
         // Restore inventory and force an update of the upgrade cache.
         mInventory.readFromNBT(pNBT);
         markDirty();
 
-        mEnergyStorage.readFromNBT(pNBT);
+        mEnergy.storage()
+            .readFromNBT(pNBT);
         mFurnaceEnergyBuffer = Math.max(pNBT.getInteger(NBTConstants.FURNACE_ENERGY_BUFFER), 0);
     }
 
@@ -337,37 +275,38 @@ public class SolarPanelTileEntity extends BaseModTileEntitySynced implements IIn
         pNBT.setInteger(NBTConstants.TIER_INDEX, mTierIndex);
         pNBT.setInteger(NBTConstants.FURNACE_ENERGY_BUFFER, mFurnaceEnergyBuffer);
         mInventory.writeToNBT(pNBT);
-        mEnergyStorage.writeToNBT(pNBT);
+        mEnergy.storage()
+            .writeToNBT(pNBT);
     }
 
-    /**
-     * The S35 packet only carries what the client displays. The five upgrade slots are deliberately absent: the
-     * container syncs the open GUI's slots itself, and a field of panels would otherwise ship every upgrade stack to
-     * every client on chunk load. The capacity is sent because the client can no longer derive it from the items.
-     */
     @Override
     protected void addSyncDataToNBT(NBTTagCompound pNBT) {
-        pNBT.setInteger(NBTConstants.TIER_INDEX, mTierIndex);
-        pNBT.setInteger(NBTConstants.ENERGY, getEnergyStored());
-        pNBT.setInteger(NBTConstants.SYNC_CAPACITY, getMaxEnergyStored());
-        pNBT.setInteger(NBTConstants.SYNC_GENERATION, mCurrentEnergyGeneration);
-        pNBT.setFloat(NBTConstants.SYNC_SUN_INTENSITY, mSunIntensity);
+        PanelSync.write(
+            pNBT,
+            mTierIndex,
+            getEnergyStored(),
+            getMaxEnergyStored(),
+            mEnergy.currentGeneration(),
+            mEnergy.sunIntensity());
     }
 
     @Override
     protected void loadSyncDataFromNBT(NBTTagCompound pNBT) {
-        mTierIndex = ModConfiguration.clampTierIndex(pNBT.getInteger(NBTConstants.TIER_INDEX));
-        int capacity = pNBT.getInteger(NBTConstants.SYNC_CAPACITY);
+        PanelSync.Data data = PanelSync.read(pNBT);
+        mTierIndex = ModConfiguration.clampTierIndex(data.tier());
+        int capacity = data.capacity();
         if (capacity <= 0) {
             // A packet from a build that did not send the capacity yet: fall back to the tier's base value so the
             // gauge never divides by zero.
             capacity = ModConfiguration.getTierConfiguration(mTierIndex)
                 .getCapacity();
         }
-        mEnergyStorage.setMaxEnergyStored(capacity);
-        mEnergyStorage.setEnergyStored(pNBT.getInteger(NBTConstants.ENERGY));
-        mCurrentEnergyGeneration = pNBT.getInteger(NBTConstants.SYNC_GENERATION);
-        mSunIntensity = pNBT.getFloat(NBTConstants.SYNC_SUN_INTENSITY);
+        mEnergy.storage()
+            .setMaxEnergyStored(capacity);
+        mEnergy.storage()
+            .setEnergyStored(data.energy());
+        mEnergy.setCurrentGeneration(data.generation());
+        mEnergy.setSunIntensity(data.sunIntensity());
     }
 
     /**
@@ -431,11 +370,12 @@ public class SolarPanelTileEntity extends BaseModTileEntitySynced implements IIn
 
     @Override
     public String toString() {
-        return Objects.toStringHelper(this)
-            .add("hash", hashCode())
-            .add("MaxProduction", getMaximumEnergyGeneration())
-            .add("energyStorage", getEnergyStorage())
-            .toString();
+        return "SolarPanelTileEntity{hash=" + hashCode()
+            + ", MaxProduction="
+            + getMaximumEnergyGeneration()
+            + ", energyStorage="
+            + getEnergyStorage()
+            + "}";
     }
 
     public BaseInventory getInventory() {

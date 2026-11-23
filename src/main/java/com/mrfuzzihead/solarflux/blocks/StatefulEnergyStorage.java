@@ -16,6 +16,7 @@ public class StatefulEnergyStorage implements IEnergyStorage {
     protected int mMaxTransferReceive;
     protected int mMaxTransferExtract;
 
+    /** Convenience for tests and harnesses: the capacity is also used as both transfer rates. */
     public StatefulEnergyStorage(int pCapacity) {
         this(pCapacity, pCapacity, pCapacity);
     }
@@ -24,6 +25,7 @@ public class StatefulEnergyStorage implements IEnergyStorage {
         this(pCapacity, pMaxTransfer, pMaxTransfer);
     }
 
+    /** Convenience for tests and harnesses that need different receive and extract rates. */
     public StatefulEnergyStorage(int pCapacity, int pMaxTransferReceive, int pMaxTransferExtract) {
         mCapacity = pCapacity;
         mMaxTransferReceive = pMaxTransferReceive;

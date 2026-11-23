@@ -21,14 +21,14 @@ Baseline measurements:
 
 | Metric | Value |
 | --- | --- |
-| Test cases | 264 |
-| Line coverage (JaCoCo, filtered) | 837 / 1438 = **58.2 %** |
-| Branch coverage (filtered) | 286 / 452 = **63.3 %** |
-| Coverage gate | 46 % line / 50 % branch (12.2 / 13.3 points below actual) |
+| Test cases | 274 |
+| Line coverage (JaCoCo, filtered) | 888 / 1490 = **59.6 %** |
+| Branch coverage (filtered) | 290 / 456 = **63.6 %** |
+| Coverage gate | 46 % line / 50 % branch (13.6 / 13.6 points below actual) |
 | Excluded from the gate | `gui/**`, `core/gui/**`, `creativetab/**`, `ModConfigurationGui*`, `ConfigurationGuiFactory`, `Tags` |
 | Server game-test checks | **158 / 158** passing (`./gradlew gameTestServer`) |
 | Client game-test checks | **6 / 6** passing (`./gradlew runClient -PgameTest`) |
-| Game-test coverage (separate report, server run) | 880 / 1441 lines = **61.1 %**, branches 39.3 % |
+| Game-test coverage (separate report, server run) | 922 / 1481 lines = **62.3 %**, branches 40.2 % |
 
 The suite is in good shape for its age: `StatefulEnergyStorage` (100 %), `BaseInventory` (97 %),
 `ConnectedIconHandler` (97 %), `core.utility` (93 %) and `items` (79 %) are well covered. The gaps are
@@ -598,7 +598,13 @@ All §2 items are now done except 8/9, which are deliberately skipped (negligibl
 | --- | --- | --- |
 | 3 | `ConfigSource` seam: `ForgeConfigSource` adapts the real file, `MapConfigSource` is the in-memory fake; `loadRestartSafeConfiguration`, `loadUpgradesConfiguration` and `parseTierConfigurations` now take a source instead of reading the static `Configuration` | `ModConfigurationLoadTest` (map source drives every general/upgrade value, defaults on an empty source, gap in Active flags keeps the indices, derived tier beyond the defaults) |
 
-Still open in §3: 4 (split the tile entity).
+**R4 (done)**
+
+| # | Change | Tests |
+| --- | --- | --- |
+| 4 | Split the tile entity: `PanelEnergy` owns the storage and display values, `PanelUpgrades` owns the slot scan/counts (with the change snapshot), `PanelSync` owns the S35 payload. The tile entity keeps the `IInventory`/`IEnergyProvider` façade, the world-dependent sun calculation, the module wiring and the disk NBT composition. 516 → 456 lines even with the new delegations. | `PanelEnergyTest`, `PanelUpgradesTest` (summed counts, unchanged slots skipped, in-place size growth, replacement, non-upgrades), `PanelSyncTest` (round trip, no inventory/disk keys, empty payload); all existing unit/game/client checks unchanged |
+
+**§3 is complete.** All ten refactors are done or, for #6, kept with a documented reason.
 
 ---
 
@@ -612,8 +618,8 @@ Still open in §3: 4 (split the tile entity).
 | `BlockPosition.forward()` | No references (only `move()` is used) | **Deleted in R1** (+ its test) |
 | `BaseModContainer` unused click constants | Only `CLICK_MODE_NORMAL`, `MOUSE_LEFT_CLICK` and `MOUSE_RIGHT_CLICK` are used | **Deleted in R1** (the three used ones stay) |
 | `LogHelper.all/trace/off/fatal` | No callers | **Class deleted in R2**; calls use `SolarFluxMod.log` (Log4j2) directly |
-| `StatefulEnergyStorage(int)` / `(int,int,int)` | Production only ever calls the 2-arg constructor (`SolarPanelTileEntity:70`); the 1-arg and 3-arg forms exist only for tests | Keep (useful API), or document them as test convenience constructors |
-| `TierConfiguration(int, int)` | Used only by `DEFAULT_TIER_CONFIGURATIONS`; the `generation * 8` rule is implicit and is the root of E2's invisibility | Make the transfer explicit in the defaults (a documented constant) or keep and document |
+| `StatefulEnergyStorage(int)` / `(int,int,int)` | Production only ever calls the 2-arg constructor (`SolarPanelTileEntity:70`); the 1-arg and 3-arg forms exist only for tests | **Documented in R4** as test/harness conveniences |
+| `TierConfiguration(int, int)` | Used only by `DEFAULT_TIER_CONFIGURATIONS`; the `generation * 8` rule is implicit and is the root of E2's invisibility | **Documented in R4** as `TRANSFER_PER_GENERATION = 8` |
 | `getConfiguration()` | Only used by `ModConfigurationGui` | Keep, but it leaks the mutable Forge `Configuration` (C4) |
 | `mInstance` public static | Used by `SolarPanelBlock.openGui` | Keep (standard 1.7.10), but consider `@Mod.Instance` + a getter |
 

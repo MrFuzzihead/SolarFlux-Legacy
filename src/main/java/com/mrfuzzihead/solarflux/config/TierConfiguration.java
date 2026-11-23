@@ -7,12 +7,15 @@ public final class TierConfiguration {
     private final int mCapacity;
     private final boolean mActive;
 
+    /** The historical rule for the compact default table: a panel moves eight times what it generates. */
+    private static final int TRANSFER_PER_GENERATION = 8;
+
     TierConfiguration(int pMaximumEnergyGeneration, int pMaximumEnergyTransfer, int pCapacity) {
         this(pMaximumEnergyGeneration, pMaximumEnergyTransfer, pCapacity, true);
     }
 
     TierConfiguration(int pMaximumEnergyGeneration, int pCapacity) {
-        this(pMaximumEnergyGeneration, pMaximumEnergyGeneration * 8, pCapacity, true);
+        this(pMaximumEnergyGeneration, pMaximumEnergyGeneration * TRANSFER_PER_GENERATION, pCapacity, true);
     }
 
     TierConfiguration(int pMaximumEnergyGeneration, int pMaximumEnergyTransfer, int pCapacity, boolean pActive) {
