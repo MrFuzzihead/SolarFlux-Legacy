@@ -1,15 +1,24 @@
-[
 {
-  "modid": "SolarFlux",
-  "name": "Solar Flux",
-  "description": "Solar Panels producing Redstone Flux",
-  "version": "${version}",
-  "mcversion": "${mcversion}",
-  "url": "",
-  "updateUrl": "",
-  "authorList": ["Nauktis"],
-  "logoFile": "",
-  "screenshots": [],
-  "dependencies": []
+  "modListVersion": 2,
+  "modList": [{
+    "modid": "${modId}",
+    "name": "${modName}",
+    "description": "Solar panels producing RF",
+    "version": "${modVersion}",
+    "mcversion": "${minecraftVersion}",
+    "url": "https://github.com/MrFuzzihead/SolarFlux-Legacy",
+    "updateUrl": "https://github.com/MrFuzzihead/SolarFlux-Legacy/releases/latest",
+    "authorList": [
+      "MrFuzzihead",
+      "Nauktis"
+    ],
+    "credits": "Nauktis",
+    "logoFile": "",
+    "screenshots": [],
+    "parent": "",
+    "requiredMods": [],
+    "dependencies": [],
+    "dependants": [],
+    "useDependencyInformation": false
+  }]
 }
-]
