@@ -1,0 +1,153 @@
+package com.mrfuzzihead.solarflux.core.gui;
+
+import java.util.List;
+import java.util.Map;
+
+import net.minecraft.entity.player.EntityPlayer;
+import net.minecraft.entity.player.InventoryPlayer;
+import net.minecraft.inventory.Container;
+import net.minecraft.inventory.ICrafting;
+import net.minecraft.inventory.Slot;
+import net.minecraft.item.ItemStack;
+
+import com.google.common.collect.Maps;
+import com.mrfuzzihead.solarflux.core.utility.Utils;
+
+/**
+ * Base class for any Container.
+ * Parts of the code inspired by code from Pahinar, VSWE and Bdew
+ */
+public class BaseModContainer extends Container {
+
+    protected static final int MOUSE_LEFT_CLICK = 0;
+    protected static final int MOUSE_RIGHT_CLICK = 1;
+    protected static final int CLICK_MODE_NORMAL = 0;
+    protected static final int PLAYER_INVENTORY_ROWS = 3;
+    protected static final int PLAYER_INVENTORY_COLUMNS = 9;
+    private final Map<Integer, Integer> mProgressBarValues = Maps.newHashMap();
+
+    /**
+     * Sends the value to the client only if it has changed or if the force flag is set.
+     */
+    protected void sendProgressBarUpdateIfChanged(int pType, int pValue, boolean pForce) {
+        if (pForce || !(mProgressBarValues.containsKey(pType) && mProgressBarValues.get(pType)
+            .equals(pValue))) {
+            for (ICrafting crafting : getCraftings()) {
+                crafting.sendProgressBarUpdate(this, pType, pValue);
+            }
+            mProgressBarValues.put(pType, pValue);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    protected List<ICrafting> getCraftings() {
+        return crafters;
+    }
+
+    @Override
+    public ItemStack transferStackInSlot(EntityPlayer pPlayer, int pSlotIndex) {
+        // Shift clicking does nothing by default.
+        return null;
+    }
+
+    @Override
+    public boolean canInteractWith(EntityPlayer pPlayer) {
+        return true;
+    }
+
+    protected void addPlayerInventorySlotsToContainer(InventoryPlayer pInventoryPlayer, int pLeft, int pTop) {
+        for (int inventoryRowIndex = 0; inventoryRowIndex < PLAYER_INVENTORY_ROWS; ++inventoryRowIndex) {
+            for (int inventoryColumnIndex = 0; inventoryColumnIndex
+                < PLAYER_INVENTORY_COLUMNS; ++inventoryColumnIndex) {
+                addSlotToContainer(
+                    new Slot(
+                        pInventoryPlayer,
+                        inventoryColumnIndex + inventoryRowIndex * 9 + 9,
+                        pLeft + inventoryColumnIndex * 18,
+                        pTop + inventoryRowIndex * 18));
+            }
+        }
+    }
+
+    protected void addPlayerActionSlotsToContainer(InventoryPlayer pInventoryPlayer, int pLeft, int pTop) {
+        for (int actionBarSlotIndex = 0; actionBarSlotIndex < 9; ++actionBarSlotIndex) {
+            this.addSlotToContainer(
+                new Slot(pInventoryPlayer, actionBarSlotIndex, pLeft + actionBarSlotIndex * 18, pTop));
+        }
+    }
+
+    /**
+     * Tries to add an ItemStack to slots in the range specified. It will first try to merge to an existing stack before
+     * using an empty one.
+     *
+     * @param pReverse when true the slots are searched from the end of the range towards the start.
+     * @returns true if at least one item moved.
+     */
+    @Override
+    protected boolean mergeItemStack(ItemStack pItemStack, int pSlotMin, int pSlotMax, boolean pReverse) {
+
+        boolean slotFound = false;
+        int currentSlotIndex = pReverse ? pSlotMax - 1 : pSlotMin;
+
+        Slot slot;
+        ItemStack stackInSlot;
+
+        // Try to merge to an existing ItemStack
+        if (pItemStack.isStackable()) {
+            while (pItemStack.stackSize > 0
+                && (!pReverse && currentSlotIndex < pSlotMax || pReverse && currentSlotIndex >= pSlotMin)) {
+                slot = getSlot(currentSlotIndex);
+                stackInSlot = slot.getStack();
+
+                if (slot.isItemValid(pItemStack) && Utils.itemStacksEqualIgnoreStackSize(pItemStack, stackInSlot)) {
+                    int combinedStackSize = stackInSlot.stackSize + pItemStack.stackSize;
+                    int slotStackSizeLimit = Math.min(stackInSlot.getMaxStackSize(), slot.getSlotStackLimit());
+
+                    if (combinedStackSize <= slotStackSizeLimit) {
+                        pItemStack.stackSize = 0;
+                        stackInSlot.stackSize = combinedStackSize;
+                        slot.onSlotChanged();
+                        slotFound = true;
+                    } else if (stackInSlot.stackSize < slotStackSizeLimit) {
+                        pItemStack.stackSize -= slotStackSizeLimit - stackInSlot.stackSize;
+                        stackInSlot.stackSize = slotStackSizeLimit;
+                        slot.onSlotChanged();
+                        slotFound = true;
+                    }
+                }
+
+                currentSlotIndex += pReverse ? -1 : 1;
+            }
+        }
+
+        // Try to add to an empty slot.
+        if (pItemStack.stackSize > 0) {
+            currentSlotIndex = pReverse ? pSlotMax - 1 : pSlotMin;
+
+            while (!pReverse && currentSlotIndex < pSlotMax || pReverse && currentSlotIndex >= pSlotMin) {
+                slot = getSlot(currentSlotIndex);
+                stackInSlot = slot.getStack();
+
+                if (slot.isItemValid(pItemStack) && stackInSlot == null) {
+                    ItemStack placedItemStack = pItemStack.copy();
+                    // Vanilla caps at min(item max stack size, slot limit); the item max matters for tools and
+                    // anything else with an unstackable or smaller-than-64 limit.
+                    placedItemStack.stackSize = Math
+                        .min(pItemStack.stackSize, Math.min(pItemStack.getMaxStackSize(), slot.getSlotStackLimit()));
+                    slot.putStack(placedItemStack);
+                    slot.onSlotChanged();
+
+                    if (slot.getStack() != null) {
+                        pItemStack.stackSize -= slot.getStack().stackSize;
+                        slotFound = true;
+                    }
+                    break;
+                }
+
+                currentSlotIndex += pReverse ? -1 : 1;
+            }
+        }
+
+        return slotFound;
+    }
+}
