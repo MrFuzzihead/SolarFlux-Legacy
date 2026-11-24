@@ -915,7 +915,9 @@ behaviours that were just found:
   reusable `build-and-test.yml` still runs `check`, so style and coverage cannot land through the
   game-test path.
 * The client half is wired into `game-test.yml`: `xvfb-run` with Mesa/llvmpipe (`LIBGL_ALWAYS_SOFTWARE=1`),
-  a marker check and its own log artifact. **Done**; the first CI run is the real validation.
+  `x11-xserver-utils`/`xauth` (LWJGL2's XRandR helper shells out to `xrandr -q`; without it the display
+  mode array is empty and startup throws), a display sanity check, a marker check and its own log
+  artifact. **Done.**
 * Raise the JaCoCo floor — **done**: 55/55 bundle floor plus the per-package rules from §6.2.
 * Add `jacocoTestReport` as a dependency of `check` — **done**.
 * `diff-cover` on changed lines — **done, informational** (`continue-on-error`); add `--fail-under=NN`

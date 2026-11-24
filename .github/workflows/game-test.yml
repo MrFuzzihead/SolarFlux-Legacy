@@ -64,18 +64,24 @@ jobs:
           if-no-files-found: warn
 
       # The client half covers the GUI title and the config GUI. A headless Ubuntu runner needs a virtual display and
-      # a software GL stack; LWJGL2 uses the GLX/OpenGL 2 profile that llvmpipe provides.
+      # a software GL stack. LWJGL2's XRandR helper shells out to the `xrandr` binary; without it `getScreenNames()` is
+      # empty and LinuxDisplay throws ArrayIndexOutOfBoundsException. `xauth` is needed by xvfb-run.
       - name: Install a virtual display for the client test
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            xvfb libgl1-mesa-dri libglx-mesa0 mesa-utils \
+            xvfb xauth x11-xserver-utils x11-utils \
+            libgl1-mesa-dri libglx-mesa0 libglu1-mesa mesa-utils \
             libxcursor1 libxrandr2 libxi6 libxxf86vm1 libxinerama1
+
+      - name: Check the virtual display
+        run: |
+          xvfb-run -a -s "-screen 0 1024x768x24 +extension RANDR +extension GLX" sh -c 'xrandr --query && glxinfo | head -20'
 
       - name: Run the client game tests
         env:
           LIBGL_ALWAYS_SOFTWARE: "1"
-        run: xvfb-run -a -s "-screen 0 1024x768x24" ./gradlew runClient -PgameTest --stacktrace
+        run: xvfb-run -a -s "-screen 0 1024x768x24 +extension RANDR +extension GLX" ./gradlew runClient -PgameTest --stacktrace
 
       - name: Check the client-test marker
         run: |
